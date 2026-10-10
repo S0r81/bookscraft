@@ -27,7 +27,8 @@ I-6 requires an append-only, hash-chained audit log with the actor type (user, a
 Chosen option: **one chain per file** (company file, system file).
 
 * Each event's `hash = SHA-256(prev_hash ‖ "\n" ‖ canonical JSON of the row)`.
-* The `document.post` event includes the `content_hash` of each new entry, so the chain also covers the ledger.
+* The `document.post` event includes the `content_hash` of each new entry (postings with their dimensions) and the revision's `settlements_hash`, so the chain also covers the ledger and the application graph.
+* The store refuses to commit a company-file write that appended no audit event (`audit.event_required`), so a forgotten audit call fails in tests rather than in production.
 * Storage triggers refuse updates, deletes, sequence gaps and wrong `prev_hash` links. The writer computes hashes.
 * `bookscraft verify` recomputes everything (quick mode on every open).
 * Actor types are exactly user, api and agent; `via` records the channel.
@@ -39,7 +40,7 @@ Chosen option: **one chain per file** (company file, system file).
 
 ### Confirmation
 
-T-STORE-13 (triggers), T-STORE-19 (verify detects edits), T-AUDIT-1 (every mutating command audits with the right actor).
+T-STORE-13 (triggers and the commit rule), T-STORE-19 (verify detects edits to events, postings, posting dimensions and settlements), T-AUDIT-1 (every mutating command audits with the right actor).
 
 ## Pros and Cons of the Options
 

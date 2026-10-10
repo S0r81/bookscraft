@@ -29,7 +29,7 @@ Chosen option: **custom protocol into the in-process router**.
 
 * The desktop serves the UI and `/api/v1` from `bookscraft://localhost/` (`http://bookscraft.localhost/` on Windows), calling `api::router` with `tower::ServiceExt::oneshot`.
 * `bookscraft serve` runs the same router over HTTP(S), plus MCP at `/mcp`.
-* The CLI and MCP run in-process on a company file (exclusive lock) or as HTTP clients of a server.
+* The CLI runs in-process on a company file (exclusive lock) or as an HTTP client of a server; the MCP server runs over stdio in-process on a company file, or at `/mcp` inside `bookscraft serve`.
 
 The full matrix is in [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) §5.
 

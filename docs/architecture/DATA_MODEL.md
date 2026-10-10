@@ -14,7 +14,7 @@ Status: accepted (2026-10-10). Owner: `storage-engineer`. Normative DDL: [`schem
 | Decimal (qty, unit price, rates, percents) | `TEXT` canonical decimal: optional `-`, digits, optional fraction, no exponent; never `REAL` or `NUMERIC` | `rust_decimal::Decimal`, written with `normalize()` |
 | Boolean | `INTEGER` 0/1 with CHECK | `bool` |
 | JSON | `TEXT` with `json_valid()` CHECK | typed struct via `serde` |
-| Optimistic concurrency | `version INTEGER` on every mutable row, +1 per update | ETag `W/"<version>"` at the API (API.md §3) |
+| Optimistic concurrency | `version INTEGER` on every row the API changes by id (lists, documents, bank lines, bank rules, bank feeds, reconciliations, import runs, the company), +1 per update; the exempt resources are listed in API.md §2 | ETag `W/"<version>"` at the API (API.md §2) |
 | Error codes from triggers | `RAISE(ABORT, '<namespace>.<code>')` | `store::StoreError::Constraint(ErrorCode)` mapped 1:1 to API error codes |
 
 Every table is `STRICT`. Foreign keys are enforced (`PRAGMA foreign_keys = ON` on every connection).
@@ -26,7 +26,7 @@ Every table is `STRICT`. Foreign keys are enforced (`PRAGMA foreign_keys = ON` o
 | Company file `*.bookscraft` | All accounting data of one company, its audit log and its attachments | Default `<data_dir>/companies/`; any local path the user picks | One process at a time (exclusive lock) |
 | System file `system.bookscraft` | Users, memberships, sessions, API tokens, company registry, job queue, server secrets, system audit log | `<data_dir>/` | The desktop app or the server |
 | Lock file `<company>.bookscraft.lock` | pid, host, process kind, start time (diagnostics only) | Next to the company file | Held with `std::fs::File::try_lock` |
-| Backups `*.bookscraft.bak-<timestamp>` | Consistent copies made with the SQLite online backup API | `<data_dir>/backups/` by default | Written by the owning process |
+| Backups `*.bookscraft.bak-<timestamp>` | Consistent copies made with the SQLite online backup API: on request, before every migration and import, and daily on the desktop (`auto` copies; only the 7 newest automatic copies per company are kept, other copies are never removed) | `<data_dir>/backups/` by default | Written by the owning process |
 
 `<data_dir>` is the per-user application data directory that `directories::ProjectDirs` computes for qualifier `org`, organization `BooksCraft` and application `BooksCraft`: typically `$XDG_DATA_HOME/bookscraft` on Linux, `%APPDATA%\BooksCraft\BooksCraft\data` on Windows and `~/Library/Application Support/org.BooksCraft.BooksCraft` on macOS. Only the `platform` crate resolves it; nothing else hard-codes a path.
 
@@ -64,7 +64,7 @@ Schema evolution: migrations are forward-only, embedded in the binary and number
 | Documents | `document_tax_line` | Tax per rate per revision | as lines |
 | Documents | `document_dimension`, `document_line_dimension` | Dimension values per revision | as lines |
 | Documents | `settlement` | AR/AP application graph (QBO LinkedTxn) | insert-only; active state derived |
-| Documents | `document_link` | Other links (estimate converted to invoice) | insert-only |
+| Documents | `document_link` | Other links: `converted_from` (estimate to invoice), `reverses` (reversing journal entry to its original) | insert-only |
 | Ledger | `journal_entry` | One per posted revision (original) and per superseded revision (reversal) | open → final once; final is immutable |
 | Ledger | `posting` | Lines of an entry: account, contact, currency, amount, base amount, line key | insert-only into open entries |
 | Ledger | `posting_dimension` | Dimension values per posting | insert-only into open entries |
@@ -73,7 +73,7 @@ Schema evolution: migrations are forward-only, embedded in the binary and number
 | Banking | `bank_import` | One row per imported statement file | insert-only |
 | Banking | `bank_txn` | Staged bank lines awaiting review; deduplicated | status mutable |
 | Banking | `bank_txn_action` | History of match, add, exclude and undo | insert-only |
-| Banking | `bank_rule` | Categorization rules | mutable, audited |
+| Banking | `bank_rule` | Categorization rules; `author_user_id` is the actor of automatic adds | mutable, audited |
 | Banking | `reconciliation`, `reconciliation_line` | Statement reconciliations; frozen on completion | in progress → completed → undone |
 | Banking | `clearing_event` | Clearing state per (account, line key) | insert-only |
 | Files | `attachment`, `attachment_blob`, `attachment_link` | Uploaded files stored inside the company file | blobs immutable; links insert and delete |
@@ -93,14 +93,14 @@ Schema evolution: migrations are forward-only, embedded in the binary and number
 | sales_receipt | customer (opt.) | — | UF or bank (req.) | as invoice | §4.2 | — | SalesReceipt |
 | customer_payment | customer (req.) | AR (req.) | UF or bank (req. if total > 0) | none | §4.3 | event; credit (ar) | Payment |
 | credit_memo | customer (req.) | AR (req.) | — | as invoice | §4.4 | credit (ar); event when applied now | CreditMemo |
-| refund_receipt | customer (opt.) | — | bank or card (req.) | as invoice | §4.5 | — | RefundReceipt |
-| customer_refund | customer (req.) | AR (req.) | bank (req.) | none | §4.6 | event; charge (ar) | Purchase or Check to a customer against AR, plus its LinkedTxn |
+| refund_receipt | customer (opt.) | — | bank, card or UF (req.) | as invoice | §4.5 | — | RefundReceipt |
+| customer_refund | customer (req.) | AR (req.) | bank (req.) | none | §4.6 | event; charge (ar) | — (QBO records a refund check as a Purchase with an AR line; it imports as an `expense`, MIGRATION_SPEC §4.3) |
 | bill | vendor (req.) | AP (req.) | — | item, account | §4.8 | charge (ap) | Bill |
 | bill_payment | vendor (req.) | AP (req.) | bank or card (req. if total > 0) | none | §4.9 | event; credit (ap) | BillPayment |
 | vendor_credit | vendor (req.) | AP (req.) | — | item, account | §4.10 | credit (ap) | VendorCredit |
 | expense | any (opt.) | — | bank, card or cash (req.) | item, account | §4.11 | charge or credit via AR/AP lines | Purchase (Cash, Check, CreditCard) |
 | card_credit | any (opt.) | — | card (req.) | item, account | §4.12 | — | Purchase with `Credit = true` |
-| vendor_refund | vendor (req.) | AP (req.) | bank or UF (req.) | none | §4.13 | event; charge (ap) | Deposit line linked to a VendorCredit |
+| vendor_refund | vendor (req.) | AP (req.) | bank or UF (req.) | none | §4.13 | event; charge (ap) | Deposit line linked to a VendorCredit (imported through undeposited funds plus a `deposit_source` line, MIGRATION_SPEC §4.3) |
 | deposit | — | — | bank (req.) | deposit_source, account | §4.14 | — | Deposit |
 | transfer | — | — | destination (req.) | one account line = source | §4.15 | — | Transfer, CreditCardPayment |
 | journal_entry | — | — | — | account (signed) | §4.16 | charge or credit via AR/AP lines | JournalEntry |
@@ -126,8 +126,8 @@ Every posting operation is one `BEGIN IMMEDIATE` transaction in this order. The 
 | 6 | Update document: `status = posted`, `revision = 1`, `version + 1` | Update header with `revision = n+1`, `version + 1` | `status = voided`, `voided_at`, `void_reason` |
 | 7 | Delete revision 0 rows | — | — |
 | 8 | Append clearing events for changed money lines (LEDGER_SPEC §11) | same | same |
-| 9 | Append audit event(s) | same | same |
-| 10 | Check that no entry is left `open`, then `COMMIT` | same | same |
+| 9 | Append audit event(s), recording each new entry's `content_hash` and the revision's `settlements_hash` (LEDGER_SPEC §10) | same | same |
+| 10 | Check that no entry is left `open` and that an audit event was appended, then `COMMIT` | same | same |
 
 The reconciled-line rule, the settlement bounds, the deposit rule and the agent rule (I-10) are checked by the calling service before step 2 and re-checked by storage where possible.
 
@@ -138,11 +138,11 @@ The reconciled-line rule, the settlement bounds, the deposit rule and the agent 
 | Entry balances (I-3) | `ledger::BalancedEntry::new` | `journal_entry_finalize` | `ledger.unbalanced`, `ledger.unbalanced_currency`, `ledger.too_few_lines` |
 | Postings append-only (I-3) | no mutating API in `store` | `posting_no_update`, `posting_final_no_delete`, `posting_insert_requires_open_entry` | `ledger.posting_immutable`, `ledger.entry_not_open` |
 | Entries immutable once final (I-3) | — | `journal_entry_final_immutable`, `journal_entry_final_no_delete`, `journal_entry_open_update_forbidden`, `journal_entry_insert_open` | `ledger.entry_immutable`, `ledger.entry_update_forbidden`, `ledger.entry_must_start_open` |
-| Reversal mirrors original, at most once (I-3) | `BalancedEntry::reversal()` | finalize trigger + `UNIQUE(reverses_entry_id)` | `ledger.reversal_mismatch`, `ledger.reversal_target_not_final` |
+| Reversal mirrors original (amounts and dimensions), at most once (I-3) | `BalancedEntry::reversal()` | finalize trigger + `UNIQUE(reverses_entry_id)` | `ledger.reversal_mismatch`, `ledger.reversal_target_not_final` |
 | Posted content immutable (I-3) | — | `document_line_snapshot_*`, `document_tax_line_snapshot_*`, `document_dimension_snapshot_*`, `document_posted_financial_fields`, `document_voided_frozen` | `document.line_immutable`, `document.posted_requires_repost`, `document.voided_immutable` |
 | Void is a reversal, not a delete (I-3) | — | `document_delete_draft_only`, `document_state_machine` | `document.delete_requires_draft`, `document.invalid_status_transition`, `document.invalid_revision` |
-| Period locks (I-5) | `ledger::LockState::check` | finalize trigger + `lock_override` immutability | `period.hard_locked`, `period.soft_locked`, `period.override_immutable` |
-| Audit chain (I-6) | `store::audit::append` computes the hash | `audit_event_append`, `audit_event_no_update`, `audit_event_no_delete` | `audit.sequence_gap`, `audit.chain_broken`, `audit.immutable` |
+| Period locks (I-5) | `ledger::LockState::check` (services also check documents that write no entry) | finalize trigger, `settlement_hard_lock`, `lock_override` immutability | `period.hard_locked`, `period.soft_locked`, `period.override_immutable` |
+| Audit chain (I-6) | `store::audit::append` computes the hash | `audit_event_append`, `audit_event_no_update`, `audit_event_no_delete`; the store's write handle refuses to commit a company-file transaction that changed rows but appended no audit event (exempt: `idempotency_key` rows, and the migration runner, which runs before the handle is handed out) | `audit.sequence_gap`, `audit.chain_broken`, `audit.immutable`, `audit.event_required` |
 | External ids unique (I-7) | — | `UNIQUE (source, realm, external_type, external_id)`; bank FITID and hash unique indexes | `import.duplicate` (mapped from UNIQUE) |
 | AR/AP lines name a contact | — | `posting_ar_ap_requires_contact` | `ledger.ar_ap_requires_contact` |
 | AR/AP account matches the document | — | `document_ar_ap_account_subtype_*` | `document.ar_ap_account_subtype` |
@@ -160,24 +160,24 @@ W0-04 implements each line as a Rust test against a fresh company file. The same
 | # | Case | Expected |
 |---|---|---|
 | 1 | Finalize a balanced two-line entry | success |
-| 2 | Finalize an unbalanced entry; a one-line entry | `ledger.unbalanced`; `ledger.too_few_lines` |
-| 3 | Update or delete a final posting; update or delete a final entry | `ledger.posting_immutable`; `ledger.entry_immutable` |
-| 4 | Insert a posting into a final entry; insert an entry already final | `ledger.entry_not_open`; `ledger.entry_must_start_open` |
+| 2 | Finalize an unbalanced entry; a one-line entry; a single-currency entry whose transaction amounts do not sum to zero | `ledger.unbalanced`; `ledger.too_few_lines`; `ledger.unbalanced_currency` |
+| 3 | Update or delete a final posting; update or delete a final entry; update or delete a final posting's dimension; update an open entry without finalizing; change an entry's date while finalizing | `ledger.posting_immutable`; `ledger.entry_immutable`; `ledger.posting_immutable`; `ledger.entry_update_forbidden`; `ledger.entry_fields_changed` |
+| 4 | Insert a posting into a final entry; insert an entry already final; insert a posting dimension into a final entry | `ledger.entry_not_open`; `ledger.entry_must_start_open`; `ledger.entry_not_open` |
 | 5 | Post to AR without a contact | `ledger.ar_ap_requires_contact` |
-| 6 | Reversal that does not mirror; reversal dated differently; second reversal | `ledger.reversal_mismatch` (twice); UNIQUE violation |
+| 6 | Reversal that does not mirror; reversal dated differently; reversal whose dimensions differ from the original's; reversal of an open entry; second reversal | `ledger.reversal_mismatch` (three times); `ledger.reversal_target_not_final`; UNIQUE violation |
 | 7 | Change a posted document's total without a repost; change only its memo; jump two revisions | `document.posted_requires_repost`; success; `document.invalid_revision` |
-| 8 | Update a revision-1 line; insert a line at the current revision; insert at current + 1 | `document.line_immutable` (twice); success |
+| 8 | Update a revision-1 line; insert a line at the current revision; insert at current + 1; update or delete a revision-1 tax line, document dimension or line dimension | `document.line_immutable` (twice); success; `document.line_immutable` |
 | 9 | Posted back to draft; delete a posted document; delete a draft (cascade); update a voided document | `document.invalid_status_transition`; `document.delete_requires_draft`; success; `document.voided_immutable` |
 | 10 | Settlement at a stale revision; update a settlement; superseded settlement in `active_settlement` | `settlement.stale_revision`; `settlement.immutable`; not listed |
 | 11 | Deposit a payment already in a posted deposit | `banking.already_deposited` |
-| 12 | Hard lock later than soft lock; soft-locked date without override; override reason too short; with override; hard-locked date with override | CHECK; `period.soft_locked`; CHECK; success; `period.hard_locked` |
-| 13 | Audit: first event; gap; broken link; update; delete | success; `audit.sequence_gap`; `audit.chain_broken`; `audit.immutable` (twice) |
-| 14 | Reconciliation: second in progress; edit completed; add line to completed; delete completed; undo without reason; undo; redo | UNIQUE; `reconciliation.invalid_transition`; `reconciliation.immutable` (twice); CHECK; success; `reconciliation.invalid_transition` |
+| 12 | Hard lock later than soft lock; soft-locked date without override; override reason too short; with override; hard-locked date with override; update or delete an override; a settlement dated on or before the hard date | CHECK; `period.soft_locked`; CHECK; success; `period.hard_locked`; `period.override_immutable`; `period.hard_locked` |
+| 13 | Audit: first event; gap; broken link; update; delete; commit a company-file write that appended no audit event | success; `audit.sequence_gap`; `audit.chain_broken`; `audit.immutable` (twice); `audit.event_required`, rolled back |
+| 14 | Reconciliation: second in progress; edit completed; add line to completed; delete completed; undo without reason; undo; redo; update or delete a clearing event; update or delete a bank review action | UNIQUE; `reconciliation.invalid_transition`; `reconciliation.immutable` (twice); CHECK; success; `reconciliation.invalid_transition`; `reconciliation.history_immutable`; `banking.history_immutable` |
 | 15 | Duplicate FITID; duplicate hash-only bank line | UNIQUE (twice) |
 | 16 | Invalid decimals (`1.2.3`, `abc`, `1e5`, `6.`), invalid date (`2026-02-30`) | CHECK |
-| 17 | Account class/subtype mismatch; second singleton system role; parent of a different class; duplicate name ignoring case | CHECK; UNIQUE; `books.account_parent_class_mismatch`; UNIQUE |
+| 17 | Account class/subtype mismatch; second singleton system role; parent of a different class; duplicate name ignoring case; dimension value whose parent belongs to another dimension; tax agency whose liability account lacks the `sales_tax_payable` role | CHECK; UNIQUE; `books.account_parent_class_mismatch`; UNIQUE; `books.dimension_parent_mismatch`; `books.tax_agency_account_role` |
 | 18 | Invoice with an AP account; invoice without contact; invoice with a money account; expense without money account | `document.ar_ap_account_subtype`; CHECK (three times) |
-| 19 | `verify` after, with triggers dropped, editing an audit row's `after_json`, editing a posting amount, and deleting an audit event | reports the first broken `seq` (and the entry id for the posting) in each case |
+| 19 | `verify` after, with triggers dropped, editing an audit row's `after_json`, editing a posting amount, editing a posting dimension, editing a settlement amount, and deleting an audit event | reports the first broken `seq`, the entry id (posting and dimension cases) or the event document and revision (settlement case) |
 | 20 | Leave an entry open and commit | `ledger.entry_left_open`, rolled back |
 
 ## 7. System file tables
@@ -193,7 +193,7 @@ W0-04 implements each line as a Rust test against a fresh company file. The same
 | `job` | In-process job queue (email, import, export, bank sync, backup, verify, reversing entries) | ADR-0024 |
 | `secret` | Server-mode envelope-encrypted secrets (bank feeds, QBO tokens, SMTP) | desktop uses the OS keychain |
 | `oauth_state` | QBO OAuth state and PKCE verifier | expires in 10 minutes |
-| `setting` | Installation settings (SMTP, server URL, preferences) | |
+| `setting` | Installation settings (SMTP, server URL, preferences) | one set per server installation, or per OS user on the desktop; SMTP through `/api/v1/settings/email` (API.md §5.1) |
 | `audit_event` | System audit log (same chain rules as the company log) | |
 | `idempotency_key` | Idempotency for system endpoints | |
 

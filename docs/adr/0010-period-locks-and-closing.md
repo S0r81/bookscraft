@@ -27,8 +27,8 @@ I-5 requires open, soft-locked and hard-locked periods, with hard-locked periods
 Chosen option:
 
 * Two lock dates on `company`, with a CHECK keeping hard ≤ soft.
-* The finalize trigger refuses entries dated on or before the hard date.
-* For soft-locked dates it requires a `lock_override` row (reason of 5 or more characters, actor) for that entry. Only `period.override` holders can create one, and each creates an audit event.
+* The finalize trigger refuses entries dated on or before the hard date, and a settlement trigger refuses settlements dated then. Services apply the same rule to documents that write no entry (zero-amount payments).
+* For soft-locked dates it requires a `lock_override` row (reason of 5 or more characters, actor) for that entry. Only `period.override` holders can create one, and each creates an audit event. A document without an entry records its override reason in the `period.override` audit event.
 * Moving the hard date earlier requires the owner role and a reason.
 * No closing entries: retained earnings and current-year net income are computed by the reports.
 
@@ -40,7 +40,7 @@ Chosen option:
 
 ### Confirmation
 
-T-STORE-12 (trigger), T-BOOKS-1 (audited lock changes, owner-only unlock), spine step S30.
+T-STORE-12 (triggers), T-BOOKS-1 (audited lock changes, owner-only unlock), T-SALES-3 and T-PURCH-1 (zero-amount payments), spine step S30.
 
 ## Pros and Cons of the Options
 

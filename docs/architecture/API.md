@@ -70,7 +70,7 @@ Every error is RFC 9457 problem details:
 }
 ```
 
-`code` is stable and machine-readable. `title` and `detail` are for people and may change. Codes are `<namespace>.<name>`:
+`code` is stable and machine-readable. `title` and `detail` are for people and may change. Codes are `<namespace>.<name>`. Codes raised by schema triggers are defined in `store` whatever their namespace (ARCHITECTURE §4.6):
 
 | Namespace | Owner crate | Examples |
 |---|---|---|
@@ -79,21 +79,24 @@ Every error is RFC 9457 problem details:
 | `idempotency`, `concurrency` | api | section 2 |
 | `auth` | domain (`auth.forbidden`, `auth.agent_forbidden`, `auth.scope_missing`), identity (the rest), api (mapping) | `auth.required`, `auth.invalid_credentials`, `auth.forbidden`, `auth.agent_forbidden`, `auth.scope_missing`, `auth.rate_limited` |
 | `money` | money | `money.overflow`, `money.currency_mismatch` |
-| `ledger`, `document`, `period`, `audit`, `settlement`, `store` | store (trigger codes from schema.sql) and ledger | DATA_MODEL.md §5 |
+| `ledger`, `document`, `period`, `audit`, `settlement`, `store` | store (trigger codes from schema.sql, `audit.event_required`) and ledger | DATA_MODEL.md §5 |
 | `posting` | posting | `posting.invalid_account`, `posting.invalid_contact`, `posting.source_unbalanced` (an import whose source amounts do not balance within 2 minor units); warning `posting.source_rounding_adjusted`. The import report shows them as `import.unbalanced_source` and `import.rounding_adjusted` (LEDGER_SPEC §8.1) |
-| `books` | books | `books.account_in_use`, `books.system_account_protected`, `books.duplicate_name`, `books.lock_reason_required`, `books.hard_unlock_requires_owner` |
+| `books` | books (plus store trigger codes) | `books.account_in_use`, `books.system_account_protected`, `books.duplicate_name`, `books.lock_reason_required`, `books.hard_unlock_requires_owner`, `books.source_in_posted_deposit` |
 | `sales`, `purchases` | sales, purchases | `sales.application_exceeds_open`, `sales.application_mismatch`, `sales.applied_amount_exceeds_total`, `sales.payment_before_charge` (warning) |
-| `banking`, `reconciliation` | banking (plus store trigger codes) | `banking.already_deposited`, `banking.match_amount_mismatch`, `reconciliation.difference_not_zero`, `reconciliation.reconciled_line_changed` |
+| `banking`, `reconciliation` | banking (plus store trigger codes) | `banking.already_deposited`, `banking.match_amount_mismatch`, `banking.credential_store_unavailable`, `reconciliation.difference_not_zero`, `reconciliation.reconciled_line_changed` |
 | `reports` | reports | `reports.invalid_period` |
 | `import`, `export` | migrate | `import.duplicate`, `import.unbalanced_source`, `import.multi_currency_unsupported`, `import.qbo_auth_failed`, `import.parity_failed` |
 | `render` | render | `render.template_error`, `render.smtp_failed`, `render.not_sendable` (only posted documents are emailed) |
 | `mcp` | mcp | `mcp.tool_not_permitted` |
+| `iif` (v1) | iif | `iif.unbalanced_transaction` |
 
 Warnings (non-blocking) come back in a `warnings` array on the success body, using the same `{field, code, message}` shape. `cargo xtask docs` regenerates the full code table, `docs/architecture/error-codes.md`, from the constants; only a Weave runs it.
 
 ## 5. HTTP endpoints
 
 Permission names refer to section 6. "Agent" shows whether an `agent` principal may call the endpoint. Every company-scoped path is under `/api/v1/companies/{cid}`, written below as `/…`.
+
+**Operation ids.** Every operation has a unique id `<group>.<name>`, used as the OpenAPI `operationId` and as the key of `domain::ports::OPERATIONS`. Where a table abbreviates, expand it like this: a generic list row (section 5.3) gives one id per resource, `<resource>.<op>` with the resource in snake case (`accounts.list`, `payment_methods.create`, `dimension_values.update`, `bank_rules.archive`); a generic typed-document row (section 5.4) gives one id per type path, in snake case (`invoices.create`, `bill_payments.replace`), plus `estimates.convert` and `estimates.set_status`; a cell with a slash names one operation per part (`attachments.get / content` is `attachments.get` and `attachments.content`; `archive / unarchive` gives both).
 
 ### 5.1 System, session and identity
 
@@ -111,6 +114,8 @@ Permission names refer to section 6. "Agent" shows whether an `agent` principal 
 | POST | `/api/v1/tokens` | tokens.create | `CreateToken {name, actor_type: api\|agent, scopes[], company_id?, expires_at?}` → `TokenCreated {token, summary}` (token shown once) | session (a human) | no |
 | DELETE | `/api/v1/tokens/{tid}` | tokens.revoke | → 204 | owner of the token or `users.manage` | no |
 | GET | `/api/v1/account-templates` | templates.list | → `[CoaTemplateSummary]` | authenticated | yes |
+| GET / PUT | `/api/v1/settings/email` | email.get / email.set | `EmailSettings {host, port, username, password?, from, tls}` (password write-only; one set per installation, or per OS user on the desktop) | `installation.manage` | no |
+| POST | `/api/v1/settings/email/test` | email.test | `{to}` → 202 `Job` | `installation.manage` | no |
 | GET | `/api/v1/jobs/{jid}` | jobs.get | → `Job {id, kind, status, progress?, result?, error?}` | job creator, or `company.read` for the job's company | yes (own jobs) |
 
 ### 5.2 Companies
@@ -127,8 +132,6 @@ Permission names refer to section 6. "Agent" shows whether an `agent` principal 
 | GET | `/…/backups` | backups.list | → `[Backup]` | `company.backup` | no |
 | POST | `/…/verify` | company.verify | `{mode: quick\|full}` → 202 `Job` (result `VerifyReport`) | `audit.read` | no |
 | GET / PUT | `/…/settings/number-sequences` | sequences.list / sequences.set | `{doc_type, prefix, next_value, padding}` | `company.read` / `settings.manage` | read only |
-| GET / PUT | `/…/settings/email` | email.get / email.set | `EmailSettings {host, port, username, password?, from, tls}` (password write-only) | `settings.manage` | no |
-| POST | `/…/settings/email/test` | email.test | `{to}` → 202 `Job` | `settings.manage` | no |
 
 ### 5.3 Lists (books)
 
@@ -162,7 +165,6 @@ Extra list endpoints:
 | Method | Path | Operation | Request → Response | Permission | Agent |
 |---|---|---|---|---|---|
 | GET | `/…/contacts/{id}/open-items` | contacts.open_items | `?ledger=ar\|ap` → `[OpenItem {document_id, doc_type, number, date, due_date, original, open}]` | `books.read` | yes |
-| GET | `/…/contacts/{id}/statement` | contacts.statement | `?from&to` → `Statement` | `books.read` | yes |
 | POST | `/…/attachments` | attachments.upload | multipart `file`, optional `entity_type`, `entity_id` → `Attachment` | `books.write` | yes (own drafts only) |
 | GET | `/…/attachments/{id}` and `/…/attachments/{id}/content` | attachments.get / content | → `Attachment`; raw bytes with the stored content type | `books.read` | yes |
 | POST / DELETE | `/…/attachments/{id}/links`, `/…/attachments/{id}/links/{entity_type}/{entity_id}` | attachments.link / unlink | `{entity_type, entity_id}` | `books.write` | no |
@@ -216,7 +218,7 @@ Extra list endpoints:
 | `journal-entries` | journal_entry | `books.write` | yes (draft) |
 | `opening-balances` | opening_balance | `period.lock` | no |
 
-Saving with `post = true` additionally needs `documents.post` and is refused for agents (403 `auth.agent_forbidden`). Agents never touch documents that move money (payments, refunds, deposits, transfers).
+Saving with `post = true` additionally needs `documents.post` and is refused for agents (403 `auth.agent_forbidden`). Agents never create payments, refunds, deposits or transfers through these typed endpoints. The only way an agent creates a deposit or transfer is a bank-line proposal (`bank_txns.add`, MCP `propose_bank_categorization`), which is always a draft that a person approves.
 
 ### 5.5 Banking and reconciliation
 
@@ -227,7 +229,7 @@ Saving with `post = true` additionally needs `documents.post` and is refused for
 | GET | `/…/bank-transactions` | bank_txns.list | `account_id`, `status[]`, `from`, `to` → `Paged<BankTxn>` | `books.read` | yes |
 | GET | `/…/bank-transactions/{id}` | bank_txns.get | → `BankTxn` with `suggestions[{document_id, score, reason}]` and rule suggestion | `books.read` | yes |
 | POST | `/…/bank-transactions/{id}/match` | bank_txns.match | `{document_id}` → `BankTxn` | `bank.review` | no |
-| POST | `/…/bank-transactions/{id}/add` | bank_txns.add | `{doc_type: expense\|deposit\|transfer, account_id, contact_id?, memo?, dimensions?}` → `{bank_txn, document}` (posted for humans, a draft linked as a suggestion for agents) | `bank.review` (humans), `drafts.write` (agents) | yes (draft) |
+| POST | `/…/bank-transactions/{id}/add` | bank_txns.add | `{doc_type: expense\|deposit\|transfer, account_id, contact_id?, memo?, dimensions?}` → `{bank_txn, document}` (posted when the principal may post, otherwise a draft linked as the line's suggestion) | `bank.review` | yes (draft) |
 | POST | `/…/bank-transactions/{id}/exclude`, `/undo` | bank_txns.exclude / undo | → `BankTxn` | `bank.review` | no |
 | POST | `/…/bank-rules/{id}/preview` | bank_rules.preview | → `[BankTxn]` that would match | `books.read` | yes |
 | POST | `/…/reconciliations` | recon.start | `{account_id, statement_date, ending_balance}` → `Reconciliation` | `reconcile` | no |
@@ -263,11 +265,12 @@ Permission: `reports.read` (audit events: `audit.read`). Agents may read reports
 
 | Method | Path | Operation | Request → Response | Permission | Agent |
 |---|---|---|---|---|---|
-| POST | `/…/imports` | imports.start | `{source: qbo_api\|csv\|interchange\|iif, options}` (multipart when a file is sent) → 202 `Job` + `ImportRun` | `import.run` | no |
+| POST | `/…/imports` | imports.start | `{source: qbo_api\|csv\|interchange, options}` (multipart when a file is sent; source `iif` is added in v1) → 202 `Job` + `ImportRun` | `import.run` | no |
 | GET | `/…/imports` and `/…/imports/{id}` | imports.list / get | → `ImportRun {status, stats, validation{months[], aging[], residuals[]}, warnings[]}` | `import.run` | no |
 | POST | `/…/imports/{id}/rollback` | imports.rollback | `{reason}` → 202 `Job` | `import.run` | no |
 | POST | `/…/imports/qbo/connect` | qbo.connect | → `{authorize_url, state}` | `import.run` | no |
-| GET | `/…/imports/qbo/callback` | qbo.callback | `?code&state&realmId` (browser redirect, server mode) → 302 to the migration page | session | no |
+| GET | `/…/imports/qbo/callback` | qbo.callback | `?code&state&realmId` (browser redirect, server mode) → 302 to the migration page | none: the single-use `state` (10 minutes) binds the request to the user and company that started the connection, because the `SameSite=Strict` session cookie is not sent on a redirect from Intuit | no |
+| GET | `/…/imports/qbo/estimate` | qbo.estimate | → `{entities: [{entity, count}], report_calls, total_requests}` from `COUNT(*)` queries on the connected company (MIGRATION_SPEC §4.1, metering) | `import.run` | no |
 | POST | `/…/imports/qbo/token` | qbo.token | `{realm_id, access_token, refresh_token, access_expires_at}` (paste flow) → 204 | `import.run` | no |
 | POST | `/…/exports` | exports.start | `{format: interchange\|csv}` → 202 `Job` | `export.run` | no |
 | GET | `/…/exports/{id}/download` | exports.download | → `application/zip` | `export.run` | no |
@@ -289,7 +292,7 @@ Permission: `reports.read` (audit events: `audit.read`). Agents may read reports
 | `audit.read` | ✓ | ✓ | ✓ | | |
 | `import.run`, `export.run`, `company.backup` | ✓ | ✓ | ✓ | | |
 | `settings.manage`, `members.manage` | ✓ | ✓ | | | |
-| Installation level: `company.create`, `users.manage` | users with `is_admin` | | | | |
+| Installation level: `company.create`, `users.manage`, `installation.manage` (SMTP and other installation settings) | users with `is_admin` (on the desktop, the desktop principal) | | | | |
 
 **Token scopes** narrow a token below its owner's role. The effective permission is: role permits **and** scope permits **and** the agent rule.
 
@@ -297,12 +300,12 @@ Permission: `reports.read` (audit events: `audit.read`). Agents may read reports
 |---|---|---|---|
 | `books:read` | `company.read`, `books.read` | ✓ | ✓ |
 | `reports:read` | `reports.read` | ✓ | ✓ |
-| `drafts:write` | create, update and delete drafts the token created; attachments on those drafts; `bank.add` as draft | ✓ | ✓ |
+| `drafts:write` | `books.write` and `bank.review`, for drafts only: create, update and delete drafts the token created, attachments on those drafts, and bank-line adds (which become drafts) | ✓ | ✓ |
 | `books:write` | `books.write`, `documents.post`, `documents.send`, `bank.review`, `reconcile` | ✓ | **never** (T-ID-2) |
 
-**Agent rule (I-10).** A principal with `actor_type = agent` is refused (403 `auth.agent_forbidden`) on: post, approve, void, repost, delete of non-own drafts, period locks, reconciliation, bank match, exclude and undo, imports, exports, backups, settings, members, users, tokens, bank feeds and audit events. This holds whatever scopes are granted (T-API-1).
+**Agent rule (I-10).** A principal with `actor_type = agent` is refused (403 `auth.agent_forbidden`) on: post, approve, void, repost, delete of drafts it did not create, setting period locks, every reconciliation action (start, update, tick, complete, undo, discard, unreconcile), bank match, exclude and undo, bank statement imports, imports, exports, backups and verify, changing settings, members, users or tokens, bank-feed actions (connect, link, sync, disable), and reading audit events. Read endpoints that section 5 marks for agents (period locks, number sequences, reconciliations, bank feeds) stay readable. This holds whatever scopes are granted (T-API-1).
 
-**Machine-readable permissions.** Every operation in the generated OpenAPI document carries two extensions: `x-bookscraft-permission` (a permission name from the table above, or `none` or `authenticated`) and `x-bookscraft-agent` (`true` when an agent may call it, matching the Agent column in section 5). Handlers check the permission before calling a service, so a refusal does not depend on the service being implemented. T-API-1 enumerates the operations from `api::openapi()` and calls every operation marked `x-bookscraft-agent: false` with an agent token, expecting 403 `auth.agent_forbidden`; T-API-2 fails when an operation lacks either extension. Area work packages therefore add their routes to the test automatically.
+**Machine-readable permissions.** Every operation in the generated OpenAPI document carries two extensions. `x-bookscraft-permission` is one of: a permission name from the table above; `none` (no credentials: health, login, the QBO callback, which checks its own state); `authenticated` (any principal; the handler then applies the ownership rule written in section 5: self, own token, own job, own draft); or `human` (a user session or the desktop principal, never an `api` or `agent` token). Section 5's wording maps to them: a cell that combines a permission with an ownership rule ("`users.manage` or self", "self (current required) or `users.manage`", "owner of the token or `users.manage`", "job creator, or `company.read`") is `authenticated` with that rule; "session", "session (a human)" and "authenticated human" are `human`; "none (server mode)" is `none`. `x-bookscraft-agent` is `true` when the Agent column in section 5 says yes in any form (yes, read only, own drafts, yes (draft)), with the stated restriction enforced by the handler or service, and `false` for no. Handlers check the permission before calling a service, so a refusal does not depend on the service being implemented. T-API-1 enumerates the operations from `api::openapi()` and calls every operation marked `x-bookscraft-agent: false` with an agent token, expecting 403 `auth.agent_forbidden`; T-API-2 fails when an operation lacks either extension. Area work packages therefore add their routes to the test automatically.
 
 ## 7. Shared DTO shapes
 
@@ -411,14 +414,14 @@ Input-only fields: `post` (boolean, default false) and `lock_override_reason` (s
 | `update_draft`, `delete_draft` | `drafts:write` | Only drafts created by the same token |
 | `propose_bank_categorization` | `drafts:write` | For a bank line: create a draft expense, deposit or transfer and attach it as the line's suggestion |
 
-Never exposed as tools: post, approve, void, repost, delete of others' drafts, payments, refunds, deposits, transfers, period locks, reconciliation, imports, exports, settings, users, tokens, bank feeds, attachments of posted documents. The tool list is snapshot-tested (T-MCP-1).
+Never exposed as tools: post, approve, void, repost, delete of others' drafts, creating payments or refunds, creating deposits or transfers other than as a bank-line proposal draft, period locks, reconciliation, imports, exports, settings, users, tokens, bank feeds, attachments of posted documents. The tool list is snapshot-tested (T-MCP-1).
 
 ## 9. CLI surface (W4-02)
 
 ```text
 bookscraft [--company <file> | --server <url> [--token-file <file>]] [--data-dir <dir>] [--format table|json|csv] [--yes] <command>
 
-serve        --config <file> --bind <addr:port> [--tls-cert <pem> --tls-key <pem>] [--ui-dir <dir>]
+serve        --config <file> --bind <addr:port> [--tls-cert <pem> --tls-key <pem>] [--ui-dir <dir>] [--log-format text|json]
 mcp          (stdio; requires --company; remote agents use the server's /mcp)
 company      create --name <n> --currency <ISO> --fy-start <1-12> --time-zone <IANA> --template <freelancer|agency|service|blank> [--path <file>]
              list | info

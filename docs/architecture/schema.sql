@@ -566,17 +566,23 @@ CREATE INDEX settlement_event_idx ON settlement(event_document_id, event_revisio
 CREATE TRIGGER settlement_revision_current BEFORE INSERT ON settlement
 WHEN NEW.event_revision < (SELECT revision FROM document WHERE id = NEW.event_document_id)
 BEGIN SELECT RAISE(ABORT, 'settlement.stale_revision'); END;
+-- Hard-locked periods are immutable for settlements too, including those of documents that write
+-- no journal entry (zero-amount payments). Soft locks for those are checked by the service.
+CREATE TRIGGER settlement_hard_lock BEFORE INSERT ON settlement
+WHEN NEW.settled_on <= coalesce((SELECT hard_locked_through FROM company), '0000-01-01')
+BEGIN SELECT RAISE(ABORT, 'period.hard_locked'); END;
 CREATE TRIGGER settlement_no_update BEFORE UPDATE ON settlement
 BEGIN SELECT RAISE(ABORT, 'settlement.immutable'); END;
 CREATE TRIGGER settlement_no_delete BEFORE DELETE ON settlement
 BEGIN SELECT RAISE(ABORT, 'settlement.immutable'); END;
 
--- Non-settlement links between documents (estimate -> invoice today; more types in v1).
+-- Non-settlement links between documents: an invoice converted from an estimate, and a reversing
+-- journal entry that reverses another (LEDGER_SPEC section 4.16). More types in v1.
 CREATE TABLE document_link (
     id                TEXT PRIMARY KEY CHECK (length(id) = 36),
     from_document_id  TEXT NOT NULL REFERENCES document(id),
     to_document_id    TEXT NOT NULL REFERENCES document(id),
-    link_type         TEXT NOT NULL CHECK (link_type IN ('converted_from')),
+    link_type         TEXT NOT NULL CHECK (link_type IN ('converted_from', 'reverses')),
     amount_minor      INTEGER,
     created_at        TEXT NOT NULL CHECK (created_at GLOB '????-??-??T??:??:??.???Z'),
     CHECK (from_document_id <> to_document_id),
@@ -683,7 +689,13 @@ BEGIN
             SELECT 1 FROM posting p
             WHERE p.journal_entry_id IN (NEW.id, NEW.reverses_entry_id)
             GROUP BY p.line_key, p.account_id, coalesce(p.contact_id, ''), p.currency
-            HAVING sum(p.amount_minor) <> 0 OR sum(p.base_amount_minor) <> 0));
+            HAVING sum(p.amount_minor) <> 0 OR sum(p.base_amount_minor) <> 0)
+       -- each (line key, dimension, value) must appear once in the original and once in the reversal
+       OR EXISTS (
+            SELECT 1 FROM posting p JOIN posting_dimension d ON d.posting_id = p.id
+            WHERE p.journal_entry_id IN (NEW.id, NEW.reverses_entry_id)
+            GROUP BY p.line_key, d.dimension_id, d.value_id
+            HAVING count(*) <> 2));
 END;
 
 CREATE TRIGGER journal_entry_open_update_forbidden BEFORE UPDATE ON journal_entry
@@ -766,6 +778,7 @@ CREATE TABLE bank_rule (
     conditions_json TEXT NOT NULL CHECK (json_valid(conditions_json)),
     actions_json    TEXT NOT NULL CHECK (json_valid(actions_json)),
     auto_add        INTEGER NOT NULL DEFAULT 0 CHECK (auto_add IN (0, 1)),
+    author_user_id  TEXT NOT NULL,                       -- auto_add runs as this user (LEDGER_SPEC section 11)
     is_archived     INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1)),
     version         INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
     created_at      TEXT NOT NULL CHECK (created_at GLOB '????-??-??T??:??:??.???Z'),
@@ -790,6 +803,7 @@ CREATE TABLE bank_txn (
     txn_type           TEXT,
     status             TEXT NOT NULL CHECK (status IN ('for_review', 'matched', 'added', 'excluded')),
     suggested_rule_id  TEXT REFERENCES bank_rule(id),
+    version            INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
     created_at         TEXT NOT NULL CHECK (created_at GLOB '????-??-??T??:??:??.???Z'),
     updated_at         TEXT NOT NULL CHECK (updated_at GLOB '????-??-??T??:??:??.???Z'),
     CHECK ((import_id IS NULL) <> (feed_id IS NULL))
@@ -831,6 +845,7 @@ CREATE TABLE reconciliation (
     undone_by                TEXT,
     undone_at                TEXT CHECK (undone_at IS NULL OR undone_at GLOB '????-??-??T??:??:??.???Z'),
     undo_reason              TEXT,
+    version                  INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
     CHECK ((status IN ('completed', 'undone')) = (completed_at IS NOT NULL AND snapshot_hash IS NOT NULL)),
     CHECK ((status = 'undone') = (undone_at IS NOT NULL AND undo_reason IS NOT NULL))
 ) STRICT;
@@ -928,6 +943,7 @@ CREATE TABLE import_run (
     first_audit_seq    INTEGER,
     last_audit_seq     INTEGER,
     actor_id           TEXT NOT NULL,
+    version            INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
     started_at         TEXT NOT NULL CHECK (started_at GLOB '????-??-??T??:??:??.???Z'),
     finished_at        TEXT CHECK (finished_at IS NULL OR finished_at GLOB '????-??-??T??:??:??.???Z')
 ) STRICT;
@@ -987,7 +1003,7 @@ CREATE TABLE audit_event (
 CREATE INDEX audit_event_entity_idx ON audit_event(entity_type, entity_id, seq);
 CREATE INDEX audit_event_time_idx ON audit_event(occurred_at);
 
--- The writer computes `hash` (SHA-256, see LEDGER_SPEC.md section 9); storage enforces the links.
+-- The writer computes `hash` (SHA-256, see LEDGER_SPEC.md section 10); storage enforces the links.
 CREATE TRIGGER audit_event_append BEFORE INSERT ON audit_event
 BEGIN
     SELECT RAISE(ABORT, 'audit.sequence_gap')

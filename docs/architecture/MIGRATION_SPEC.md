@@ -6,11 +6,12 @@ Status: accepted (2026-10-10). Owner: `import-migration-engineer`. Crates: `inte
 
 | Path | Source | MVP? | Validation |
 |---|---|---|---|
-| QBO API | QuickBooks Online REST API (OAuth 2.0) | **MVP** (W3-03 mapper, W3-04 pipeline, W4-03 connector) | Trial balance at every month-end and AR/AP aging per contact, to the cent |
+| QBO API | QuickBooks Online REST API (OAuth 2.0), full history | **MVP** (W3-03 mapper, W3-04 pipeline, W4-03 connector) | Trial balance at every month-end and AR/AP aging per contact, to the cent |
+| QBO API, cut-over mode | Opening balances at a cut-over date plus the open AR/AP items, then later transactions (G-16 option) | **v1** | Trial balance from the cut-over date |
 | CSV / XLSX lists | Accounts, contacts, items; opening trial balance | **MVP** (W3-04) | Row-level validation; opening TB must balance |
 | CSV / OFX bank lines | Statement lines | **MVP** (W2-03, banking) | Dedupe (I-7) |
 | Interchange bundle | BooksCraft's own export (round trip, or produced by third-party tools) | **MVP** (W3-04) | Round trip: trial balance identical |
-| IIF | QuickBooks Desktop lists and transactions | Parser and writer in MVP (W1-04); import path **v1** | Trial balance by month (no reliable links, section 8) |
+| IIF | QuickBooks Desktop lists and transactions | **v1** (parser, writer and import path; the `iif` crate is a stub until then) | Trial balance by month (no reliable links, section 8) |
 | Desktop transactions | Journal or General Ledger report exported to CSV or XLSX | **v1** | Trial balance by month |
 | QBW files | — | **never** (clean room, C-11) | — |
 
@@ -113,8 +114,8 @@ Each document is imported with the documented service command in the state QBO r
 | Discount lines | DiscountLineDetail becomes the document discount (percent or amount, discount account). A second discount line on one document is imported as a negative item line on that discount account, with warning `import.discount_lines_merged`. |
 | Group (bundle) lines | GroupLineDetail becomes a group line plus its component lines (`group_line_no`); components post. |
 | Inventory items | Imported as kind `inventory` with their asset account. COGS and inventory postings that QBO computes, and that are not visible on the documents, surface as month-end trial balance differences and become residual journal entries (section 6). Native FIFO inventory is "later". |
-| Customer refunds paid by check | A Purchase with an AR line for a customer, linked from a Payment, is imported as an expense with an AR account line plus the settlement. |
-| Vendor refunds | A Deposit line linked to a VendorCredit is imported as a deposit line to AP for that vendor, plus a settlement (event = the deposit). |
+| Customer refunds paid by check | A Purchase with an AR line for a customer, linked from a Payment, is imported as an `expense` with an AR account line (a charge on AR, LEDGER_SPEC §5) plus the settlement, whose event is the linking payment. The native `customer_refund` document is for refunds entered in BooksCraft. |
+| Vendor refunds | A Deposit line linked to a VendorCredit is imported as a `vendor_refund` document (date = the deposit's date, money account = undeposited funds, settlement with the vendor credit, event = the refund) plus a `deposit_source` line for it in the imported deposit. The deposit's total and the trial balance therefore match QBO, and undeposited funds nets to zero. |
 | Credit card payments | QBO CreditCardPayment (or a Transfer to a card account) becomes a `transfer` into the card account. |
 | Projects | Sub-customers flagged as projects keep the contact hierarchy. The Project dimension mapping is v1. |
 | Employees | Imported as contacts with the employee role. Payroll transactions (if the API exposes them as journal entries) import as journal entries; otherwise they appear as residuals (G-17). |
@@ -128,7 +129,8 @@ Each document is imported with the documented service command in the state QBO r
 |---|---|
 | `Payment.Line[]`, each with one `LinkedTxn` to an Invoice, JournalEntry or CreditMemo, and an Amount | The payment's credit lines (CreditMemo, or a JournalEntry credit) and charge lines (Invoice, or a JournalEntry debit) are paired greedily in line order. Credits are applied first, then the payment's own amount. One `settlement` row is written per pair, with event = payment and date = the payment's TxnDate. `UnappliedAmt` remains the payment's open credit. Pairing order does not change any document's open amount or recognition date, so aging and cash basis are unaffected. |
 | `BillPayment.Line[]` with `LinkedTxn` to a Bill, VendorCredit or JournalEntry | Same algorithm on AP |
-| `Deposit.Line[]` with `LinkedTxn` to a Payment, SalesReceipt or RefundReceipt (or a transfer from undeposited funds) | `deposit_source` lines pointing at the imported source documents |
+| `Deposit.Line[]` with `LinkedTxn` to a Payment, SalesReceipt or RefundReceipt (or a transfer from undeposited funds) | `deposit_source` lines pointing at the imported source documents (a refund receipt paid from undeposited funds is a negative source, LEDGER_SPEC §4.14) |
+| `Deposit.Line[]` with `LinkedTxn` to a VendorCredit | a `vendor_refund` document plus its `deposit_source` line (section 4.3) |
 | `Deposit.Line[]` without a link | account lines (cash back is a negative line) |
 | `Invoice.LinkedTxn` to an Estimate | `document_link (converted_from)` |
 | `CreditMemo` applied on its own (no payment) | QBO records credit memo applications through payments. A credit memo that QBO reports as fully applied with no linking payment gets a settlement whose event is the credit memo, paired with invoices of the same customer by oldest due date, and warning `import.application_inferred`. |
@@ -141,7 +143,7 @@ After links are rebuilt, each imported document's open amount must equal QBO's `
 | Check | Method | Pass condition | Gating |
 |---|---|---|---|
 | Month-end trial balance | For every month-end `M` from the first imported month to the last, fetch QBO `Reports/TrialBalance?end_date=M&accounting_method=Accrual` and compare each account (mapped through `external_ref`) with BooksCraft's trial balance as of `M` | Every account equal to the cent, every month | **yes** |
-| AR and AP aging per contact | Fetch QBO `Reports/AgedReceivables` and `Reports/AgedPayables` as of the last imported date (and the cut-over date in cut-over mode); compare the total per contact | Every contact equal to the cent | **yes** |
+| AR and AP aging per contact | Fetch QBO `Reports/AgedReceivables` and `Reports/AgedPayables` as of the last imported date; compare the total per contact | Every contact equal to the cent | **yes** |
 | Document balances | QBO `Balance` field vs BooksCraft open amount (section 5) | Equal | **yes** |
 | Cash-basis P&L | QBO `Reports/ProfitAndLoss?accounting_method=Cash` per month vs BooksCraft cash basis | Reported with differences per account and month | no (MVP measures it; R-3) |
 | Counts | Entities fetched vs created vs archived vs skipped (with reasons) | Every fetched row accounted for | **yes** |
@@ -176,7 +178,7 @@ Column mapping:
 
 Encoding is UTF-8, with Windows-1252 accepted when detected. Each row's external id is the value of a column chosen as key, or else `sha256(file name ‖ row number ‖ row content)`. Re-imports therefore skip rows already imported.
 
-## 8. IIF import (v1; parser and writer in MVP)
+## 8. IIF import (v1)
 
 | Topic | Rule |
 |---|---|
@@ -222,5 +224,5 @@ This gives one-way refresh for parallel running during cut-over. Two-way sync is
 | T-MIG-5 | Residual reconstruction: a fixture with a hidden COGS posting yields one residual JE per affected month, and validation passes afterwards | W3-04 |
 | T-MIG-6 | Rollback in all three cases (section 10) | W3-04 |
 | T-MIG-7 | QBO connector against a recorded HTTP fixture (pagination, 429 retry, token refresh) | W4-03 |
-| T-MIG-8 | IIF parser: every list and transaction type; unbalanced block refused; Windows-1252 | W1-04 |
+| T-MIG-8 | IIF parser: every list and transaction type; unbalanced block refused; Windows-1252 | v1 |
 | Pilot | The owner migrates the agency's QBO company (sandbox first, then production) using the playbook's pilot checklist, closes one month, and compares TB and aging with QuickBooks | W5-04 |

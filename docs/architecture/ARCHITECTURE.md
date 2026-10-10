@@ -27,7 +27,7 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 | `crates/money` | MIT | yes | `Minor`, `Money`, `Currency`, decimal `Rate`, rounding modes, `allocate`, document totals (`calc`: the LEDGER_SPEC §4.1 amounts, shared by the services and the UI), checked arithmetic, decimal-string serde | — | W0-02 |
 | `crates/ledger` | MIT | yes | `BalancedEntry`, posting lines, reversal, trial balance fold, lock evaluation, invariant checks | money | W0-05 |
 | `crates/interchange` | MIT | yes | Open import/export model (the documented export bundle; MIGRATION_SPEC §3) | money | W1-04 |
-| `crates/iif` | MIT | yes | IIF reader and writer; IIF ↔ interchange mapping | interchange, money | W1-04 |
+| `crates/iif` | MIT | yes | IIF reader and writer; IIF ↔ interchange mapping (v1; a compiling stub until then) | interchange, money | W0-01 (stub), v1 |
 | `crates/ofx` | MIT | yes | OFX 1.x (SGML) and 2.x (XML), QFX and QBO (Web Connect) statement parser | money | W1-04 |
 | `crates/qbo` | MIT | yes | QBO API entity types (serde) and mapping to interchange | interchange, money | W3-03 |
 | `crates/domain` | AGPL | yes | Contracts: ids, dates, entities, documents, commands, queries, errors, capabilities, principals, permission matrix, ports | money | W0-01 (skeleton), W0-02 |
@@ -47,11 +47,11 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 | `crates/app` | AGPL | no | Composition root: builds every service from a `store::Stores` plus `domain::ports::Infra`; job runner | domain, store, books, sales, purchases, banking, reports, migrate, identity, render, api, mcp | W0-01 (compose), W1-05 |
 | `crates/ui` | AGPL | n/a | Leptos client-side app compiled to WASM: shell, design system, pages | api-types, money | W2-05 |
 | `crates/platform` | AGPL | no | All OS-specific code: directories, keychain, open URI, webview environment fixes, file permissions | domain | W0-01 (dirs), W3-05 |
-| `crates/desktop` | AGPL | no | Tauri 2 shell: window, custom protocol, embedded router, desktop principal | app, api, platform | W3-05 |
-| `crates/cli` | AGPL | no | `bookscraft` binary: `serve`, `mcp`, `company`, `import`, `export`, `verify`, `backup`, `user`, `token`, `report` | app, api, mcp, platform | W4-02 |
+| `crates/desktop` | AGPL | no | Tauri 2 shell: window, custom protocol, embedded router, desktop principal | app, api, platform, domain, store | W3-05 |
+| `crates/cli` | AGPL | no | `bookscraft` binary: `serve`, `mcp`, `company`, `import`, `export`, `verify`, `backup`, `user`, `token`, `report` | app, api, mcp, platform, domain, api-types, store | W4-02 |
 | `crates/test-support` | AGPL | n/a | Builders, fixtures, golden helpers, proptest strategies, audit assertions (dev-only) | domain, store, ledger, posting, money | W0-03 |
-| `tests/scenarios` | AGPL | n/a | Scenario spine (package `bookscraft-scenarios`) | test-support, app, domain | W0-03 |
-| `tests/e2e` | AGPL | n/a | End-to-end tests (package `bookscraft-e2e`): the web UI through WebDriver (`fantoccini` with WebKitWebDriver) against an in-process server; the API over HTTP; the desktop app through `tauri-driver` on Linux. Processes (drivers, Xvfb) are started by `cargo xtask e2e`, never by the tests (D-5) | app, api, api-types | W0-01 (stub), W2-05 (web harness), W5-04 (desktop, API, pilot) |
+| `tests/scenarios` | AGPL | n/a | Scenario spine (package `bookscraft-scenarios`) | test-support, app, domain, money | W0-03 |
+| `tests/e2e` | AGPL | n/a | End-to-end tests (package `bookscraft-e2e`): the web UI through WebDriver (`fantoccini` with WebKitWebDriver) against an in-process server; the API over HTTP; the desktop app through `tauri-driver` on Linux. Processes (drivers, Xvfb) are started by `cargo xtask e2e`, never by the tests (D-5) | app, api, api-types, domain, store | W0-01 (stub), W2-05 (web harness), W5-04 (desktop, API, pilot) |
 | `xtask` | AGPL | n/a | Build automation (`cargo xtask`); no workspace deps | — | W0-01 |
 | `spikes/ui` | AGPL | n/a | UI spike, its own Cargo workspace, excluded from the root workspace (not a member) | — | W0-06 |
 
@@ -183,9 +183,9 @@ All methods are synchronous (`fn`); handlers call them inside `tokio::task::spaw
 | `PurchasesService` | purchases | bills, bill payments, vendor credits, expenses, card credits, vendor refunds, open items per vendor |
 | `BankingService` | banking | deposits, transfers, statement import, bank transactions (list, suggestions, match, add, exclude, undo), rules, reconciliations, bank feeds |
 | `ReportsService` | reports | trial balance, P&L, balance sheet, general ledger, journal, AR and AP aging, sales tax liability, audit log; CSV rendering |
-| `ImportService` | migrate | start import (qbo_api, csv, interchange, iif), status, validation report, rollback, QBO connect and token |
+| `ImportService` | migrate | start import (qbo_api, csv, interchange; iif in v1), status, validation report, rollback, QBO connect, token and request estimate |
 | `ExportService` | migrate | export bundle (interchange, csv) |
-| `RenderService` | render | document PDF, SVG preview pages, send email (enqueues a job) |
+| `RenderService` | render | document PDF, SVG preview pages, send email (enqueues a job), SMTP settings (get, set, test) |
 | `IdentityService` | identity | users, memberships, login and logout, sessions, tokens |
 | `Authenticator` | identity | resolve a cookie or bearer token to a `Principal`; desktop principal |
 | `IdempotencyStore` | store | begin, complete and replay idempotent requests |
@@ -204,7 +204,7 @@ Feature `openapi` adds `utoipa::ToSchema` derives; `ui` does not enable it. DTOs
 
 ### 4.4 Capabilities (feature registration)
 
-Each service crate declares `pub const CAPABILITIES: &[Capability]` in its `lib.rs` and adds a capability only when it is fully implemented and tested. `app::compose` collects them. The scenario spine and `/api/v1/health` report them. Stubs start with an empty list.
+Each service crate declares `pub const CAPABILITIES: &[Capability]` in its `lib.rs` and adds a capability only when it is fully implemented and tested (`BankFeeds` and `ImportQbo` are added by W4-05 and W4-03, whose rows include those `lib.rs` files). `app::compose` collects them. The scenario spine and `/api/v1/health` report them. Stubs start with an empty list.
 
 | Crate | Capabilities |
 |---|---|
@@ -214,7 +214,7 @@ Each service crate declares `pub const CAPABILITIES: &[Capability]` in its `lib.
 | purchases | `Bills`, `BillPayments`, `VendorCredits`, `Expenses`, `CardCredits`, `VendorRefunds` |
 | banking | `Deposits`, `Transfers`, `BankImport`, `BankReview`, `BankRules`, `Reconciliation`, `BankFeeds` |
 | reports | `Reports` |
-| migrate | `ImportQbo`, `ImportCsv`, `ImportInterchange`, `ImportIif`, `Export` |
+| migrate | `ImportQbo`, `ImportCsv`, `ImportInterchange`, `ImportIif` (registered in v1), `Export` |
 | render | `RenderPdf`, `Email` |
 
 ### 4.5 Fixed constructors (no composition hotspot)
@@ -224,16 +224,19 @@ Every service crate exposes exactly one constructor and one capability list, wit
 ```rust
 // sales, purchases, banking, reports and render implement one port each
 pub fn build(stores: bookscraft_store::Stores, infra: bookscraft_domain::ports::Infra) -> std::sync::Arc<dyn bookscraft_domain::ports::SalesService>;
-// books, identity and migrate implement two ports each and return a bundle:
+// books and identity implement two ports each and return a bundle:
 //   books    -> bookscraft_domain::ports::BooksPorts    { company: Arc<dyn CompanyService>, books: Arc<dyn BooksService> }
 //   identity -> bookscraft_domain::ports::IdentityPorts { identity: Arc<dyn IdentityService>, authenticator: Arc<dyn Authenticator> }
-//   migrate  -> bookscraft_domain::ports::MigratePorts  { import: Arc<dyn ImportService>, export: Arc<dyn ExportService> }
+// migrate imports and validates through the other services, so it also receives them
+// (a Services value whose `import` and `export` are still the stub):
+pub fn build(stores: bookscraft_store::Stores, infra: bookscraft_domain::ports::Infra, services: bookscraft_domain::ports::Services)
+    -> bookscraft_domain::ports::MigratePorts; // { import: Arc<dyn ImportService>, export: Arc<dyn ExportService> }
 pub const CAPABILITIES: &[bookscraft_domain::capability::Capability];
 ```
 
 `IdempotencyStore` and `JobQueue` come from `store::Stores` directly. Until a crate is implemented, its `build` returns `domain::ports::stubs::Unimplemented`, one type that implements every service port and answers `DomainError` code `api.not_implemented` (HTTP 501). The stub lives in `domain`, so a port change made in `domain` updates the stub in the same crate and never touches a service crate.
 
-W0-01 writes the skeleton: every crate, every `build` and `CAPABILITIES`, the port trait names (empty), `Services`, `Infra`, the three port bundles, `Capability` with all variants, `DomainError`, `stubs::Unimplemented`, `store::Stores`, and `app::compose(stores, infra) -> Services`, which calls every `build`. W0-02 fills the ports with their methods without renaming any skeleton item. `app::compose` never needs editing when a crate is implemented; W1-05 adds the job runner and the HTTP state around it.
+W0-01 writes the skeleton: every crate, every `build` and `CAPABILITIES`, the port trait names (empty), `Services`, `Infra`, the three port bundles, `Capability` with all variants, `DomainError`, `stubs::Unimplemented`, `store::Stores`, and `app::compose(stores, infra) -> Services`. `compose` calls every other `build`, assembles a `Services` with the stub as `import` and `export`, passes it to `migrate::build`, and returns the final `Services`. W0-02 fills the ports with their methods without renaming any skeleton item. `app::compose` never needs editing when a crate is implemented; W1-05 adds the job runner and the HTTP state around it.
 
 **Infrastructure constructors.** The production `Infra` (section 8) is assembled by `app::infra(stores: &Stores, secrets: Arc<dyn SecretStore>) -> Infra` (W1-05): a system clock, UUIDv7 ids, and these fixed constructors, which W0-01 writes as stubs (`stubs::Unimplemented`, or an empty list) and their owners fill in later without touching `app`:
 
@@ -260,7 +263,7 @@ Services own their SQL. `store` opens files and hands out transactions; it does 
 | Idempotency keys and jobs | `store` (`IdempotencyStore` and `JobQueue` implementations) |
 | Everything else (lists, documents, bank lines, reconciliations, imports) | SQL in the owning service crate, against the normative schema |
 | Generic document actions (`post`, `approve`, `void`, `delete`) | `api` reads the document type and calls the owning service; `books` provides the shared draft, approval and void helpers that `sales`, `purchases` and `banking` call |
-| Error codes | Each code string is defined by exactly one constant, in the crate that owns its namespace; other crates import it. `domain` owns `validation.*`, `api.not_implemented` and the authorization codes `auth.forbidden`, `auth.agent_forbidden` and `auth.scope_missing`; `ledger` owns the codes `BalancedEntry` and `LockState` return, which `store` reuses for the matching triggers |
+| Error codes | Each code string is defined by exactly one constant, in the crate that owns its namespace; other crates import it. `domain` owns `validation.*`, `api.not_implemented` and the authorization codes `auth.forbidden`, `auth.agent_forbidden` and `auth.scope_missing`; `ledger` owns the codes `BalancedEntry` and `LockState` return, which `store` reuses for the matching triggers. Codes raised by schema triggers are defined in `store` whatever their namespace (for example `books.account_parent_class_mismatch`, `banking.already_deposited`), apart from those it reuses from `ledger`; the service that reports them imports them from `store` |
 
 ## 5. Process topology
 
@@ -353,12 +356,12 @@ sequenceDiagram
   SV->>ST: begin write transaction; load document revision + context
   SV->>SV: business validation (settlement bounds, deposit rule, reconciled lines, actor ≠ agent)
   SV->>P: post(document, revision, context)
-  P->>L: BalancedEntry::new(lines)
+  P->>L: BalancedEntry::new(date, lines)
   L-->>P: BalancedEntry or LedgerError
-  P-->>SV: Option<BalancedEntry> (rules_version)
-  SV->>ST: ledger::post_revision(document, entry, settlements, overrides)
+  P-->>SV: Option<PostedEntry> (BalancedEntry + rules_version)
+  SV->>ST: ledger::post_revision(document, entry, rules_version, settlements, overrides)
   ST->>ST: lines n+1 → reversal(E_n) finalize → E_n+1 finalize → settlements → header → clearing → audit
-  ST->>ST: no open entries; COMMIT
+  ST->>ST: no open entries, an audit event appended; COMMIT
   ST-->>SV: JournalView, new version
 ```
 
@@ -367,7 +370,7 @@ sequenceDiagram
 ```mermaid
 flowchart LR
   QBO["QBO API (JSON)"] --> QM["qbo: map → interchange"]
-  IIF["IIF file"] --> IM["iif: map → interchange"]
+  IIF["IIF file (v1)"] --> IM["iif: map → interchange"]
   CSV["CSV/XLSX + column map"] --> CM["migrate::csv → interchange"]
   BUN["Export bundle"] --> IC["interchange (read)"]
   QM --> PIPE
@@ -388,8 +391,8 @@ flowchart LR
 | Capabilities | `CAPABILITIES` const in each service crate | A crate adds only its own capabilities |
 | HTTP routes | `crates/api/src/routes/<area>.rs` each exposing `pub fn router() -> Router<ApiState>` and `pub fn openapi() -> utoipa::openapi::OpenApi`; `routes/mod.rs` merges all areas (written once in W1-05 with empty placeholders) | A WP owns its area file only |
 | UI routes and pages | `crates/ui/src/routes.rs` lists every MVP route (written once in W2-05); each `crates/ui/src/pages/<area>/` exports fixed component names | A WP owns its page directories only |
-| Error codes | Constants in the owning crate; the string namespace matches the crate (store owns the trigger codes in schema.sql) | `cargo xtask lint` fails on duplicate code strings; `cargo xtask docs` regenerates `docs/architecture/error-codes.md` in the Weave |
-| Migrations | `crates/store/migrations/NNNN_<slug>.sql` | Only a Weave adds one (CCR) |
+| Error codes | Constants in the owning crate; the string namespace matches the crate, except trigger codes, which `store` defines in any namespace (section 4.6) | `cargo xtask lint` fails on duplicate code strings; `cargo xtask docs` regenerates `docs/architecture/error-codes.md` in the Weave |
+| Migrations | `crates/store/migrations/company/NNNN_<slug>.sql` and `crates/store/migrations/system/NNNN_<slug>.sql` | Only a Weave adds one (CCR), with the matching `schema.sql` or `schema-system.sql` change |
 | Workspace manifest and lockfile | Root `Cargo.toml`, `Cargo.lock`, every `crates/*/Cargo.toml` | Only W0-01 and Weaves edit them; CI builds with `--locked` |
 | xtask subcommands | Pre-registered in W0-01 (`doctor`, `lint`, `scope`, `ci`, `spine`, `hook`, `warm`, `ui`, `e2e`, `package`, `docs`, `dco`), one module file each | Later WPs fill a pre-registered module only if their OWNERSHIP row lists it (`ui.rs` and `e2e.rs`: W2-05; `package.rs`: W5-01; `e2e.rs`: W5-04) |
 
@@ -534,7 +537,7 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 ## 12. Background jobs, email and rendering
 
 - **Jobs** (ADR-0024). The `job` table is in the system file. `app` runs one runner thread per process that claims due jobs (`queued`, `run_after <= now`), runs them as the creating principal, and retries with backoff (1 min, 5 min, 30 min, then failed). Kinds: `email_send`, `import`, `export`, `bank_sync`, `backup`, `verify`, `reversing_entry`. Each kind has exactly one owning port, which has a method `run_job(&self, ctx: &Ctx, job: &Job) -> Result<serde_json::Value, DomainError>` (W0-02; `domain::ports::JOB_OWNERS` lists them): `email_send` → `RenderService`, `import` → `ImportService`, `export` → `ExportService`, `bank_sync` → `BankingService`, `backup` and `verify` → `CompanyService`, `reversing_entry` → `BooksService`. The runner dispatches by kind. The CLI runs a job inline.
-- **Email.** `render::mail::Smtp` uses lettre over TLS. SMTP settings live in the system file (server) or the desktop profile; the password goes through `SecretStore`. Invoices are sent as PDF attachments.
+- **Email.** `render::mail::Smtp` uses lettre over TLS. SMTP settings are installation settings in the system file (`setting` table: one set per server, or per OS user on the desktop), edited through `/api/v1/settings/email` by installation admins; the password goes through `SecretStore`. Invoices are sent as PDF attachments.
 - **Rendering.** Typst is used as a library with embedded fonts (no system font scan in tests). Templates are data files in `crates/render/templates/`. Output is a PDF document or SVG pages for preview. The renderer is deterministic: golden PDFs are compared by extracted text and page count, SVG by snapshot.
 
 ## 13. Security model
@@ -543,7 +546,7 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 |---|---|
 | Desktop | Single OS user. Optional app password (argon2id) gates the UI at start. Company and system files are created `0600` where the OS supports it. No network listener. |
 | Server authentication | Local accounts (argon2id; login rate-limited per username and per IP in memory). Sessions in an HttpOnly, Secure, `SameSite=Strict` cookie; mutating browser requests also need header `X-BooksCraft-Client: ui`. API and agent tokens are `Authorization: Bearer bc_<32 random bytes, base64url without padding>` and stored as SHA-256. OIDC arrives in v1. |
-| Authorization | Role × permission matrix in `domain::auth` (API.md §6); token scopes narrow it further; `agent` principals can never post, void, approve, delete, change locks, manage users or read secrets (I-10). |
+| Authorization | Role × permission matrix in `domain::auth` (API.md §6); token scopes narrow it further; `agent` principals can never post, void, approve, delete drafts they did not create, change locks, manage users or read secrets (I-10). |
 | Secrets | `SecretStore` only: OS keychain on desktop, envelope encryption on the server (AES-256-GCM data keys wrapped by a key-encryption key from the server config file or environment; `kek_version` allows rotation). Secrets never reach logs, audit events or exports. |
 | Input limits | JSON bodies up to 2 MB; uploads up to 25 MB per attachment; statement files up to 10 MB; CSV imports up to 200,000 rows; every list endpoint is paginated (max 500). |
 | Transport | Server: TLS via rustls or a reverse proxy; HSTS when TLS is on. Desktop: in-process. |
@@ -557,7 +560,7 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 
 | Command | Does |
 |---|---|
-| `cargo xtask doctor [--fix]` | Checks the pinned toolchain, components, targets and cargo tools; `--fix` installs what is missing |
+| `cargo xtask doctor [--fix] [--tools]` | Checks the pinned toolchain, components, targets and cargo tools; `--fix` installs missing components and targets; `--tools` also installs the pinned cargo tools (`cargo install --locked`) |
 | `cargo xtask lint` | Dependency rules D-1..D-10, OWNERSHIP ↔ CODEOWNERS mirror, SPDX headers, unique error codes, no CRLF |
 | `cargo xtask scope <WP>` | Fails if the branch changes paths outside the WP's owned paths (vs `origin/main`) |
 | `cargo xtask ci` | Runs what CI runs: fmt check, clippy `-D warnings`, tests (every crate except `bookscraft-e2e`), lint, deny (if installed), spine |
@@ -567,7 +570,7 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 | `cargo xtask ui <build\|serve>` | Builds the WASM UI; serves it with a dev server that proxies `/api` to a running `bookscraft serve` |
 | `cargo xtask e2e [--web\|--desktop]` | Builds the UI, starts WebKitWebDriver (or `tauri-driver`) and Xvfb when needed, passes the driver's URL in `BOOKSCRAFT_WEBDRIVER_URL`, then runs `cargo test --locked -p bookscraft-e2e` (from W5-04: `--web` runs the `ui_*` and `api_*` targets, `--desktop` the `desktop_*` targets); CI job `e2e (ubuntu-latest)`, not a required check until Weave 5 decides |
 | `cargo xtask package <appimage\|deb\|rpm\|flatpak\|msi\|dmg>` | Packaging (W5-01) |
-| `cargo xtask docs [--check]` | Regenerates `docs/architecture/openapi.json` (from the `openapi-json` binary in `api`) and `docs/architecture/error-codes.md` (from the error-code constants); `--check` fails when either is stale; CI runs the check on Weave PRs, which regenerate both |
+| `cargo xtask docs [--check]` | Regenerates `docs/architecture/openapi.json` (from the `openapi-json` binary in `api`) and, on `weave/*` branches only, `docs/architecture/error-codes.md` (from the error-code constants); `--check` fails when a file it covers is stale; CI runs the check on Weave PRs, which regenerate both |
 | `cargo xtask dco --pr-body <file>` | Checks the PR description carries a valid `Signed-off-by:` line |
 
 CI (GitHub Actions, W0-01) runs these required checks on every PR: `fmt`, `clippy`, `lint`, `test (ubuntu-latest)`, `test (windows-latest)`, `test (macos-latest)`, `deny`, `spine`, `scope`, `dco`.

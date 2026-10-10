@@ -28,7 +28,7 @@ Chosen option: the algorithm in LEDGER_SPEC §7.
 
 * Documents without AR/AP postings are recognized at their date.
 * Payments and refunds recognize their money lines at their date and an "unapplied" report line for open credit.
-* Accrual documents recognize their non-AR/AP postings at each settlement date, by `allocate(target(cum_k), w) − allocate(target(cum_{k−1}), w)`.
+* Accrual documents recognize their non-AR/AP postings at each settlement date, by `allocate(−cum_k, w) − allocate(−cum_{k−1}, w)`, where `cum_k` is the running total of settled amounts, each signed by the side of the document it settles (so documents with AR or AP postings in both directions also recognize exactly their accrual amounts).
 
 ### Consequences
 

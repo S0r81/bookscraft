@@ -71,9 +71,9 @@ System accounts cannot be deleted. They can be renamed and archived only if they
 
 ## 3. From document to journal entry
 
-1. **Pure function.** `posting::post(document, revision, context) -> Result<Option<BalancedEntry>, PostingError>` lives in the `posting` crate, which has no I/O (I-2). Its inputs are the document's revision snapshot (header, lines, tax lines, settlements) plus a read-only context of the referenced accounts, items, tax rates and agencies, all loaded by the caller. It returns `None` when the document has no ledger effect (estimates, zero-amount documents).
+1. **Pure function.** `posting::post(document, revision, context) -> Result<Option<PostedEntry>, PostingError>` lives in the `posting` crate, which has no I/O (I-2). A `PostedEntry` is a `BalancedEntry` plus its `rules_version`. Its inputs are the document's revision snapshot (header, lines, tax lines, settlements) plus a read-only context of the referenced accounts, items, tax rates and agencies, all loaded by the caller. It returns `None` when the document has no ledger effect (estimates, zero-amount documents).
 2. **Versioned.** Each document type has its own rules version, for example `invoice@1`. The version is stored on every journal entry (`rules_version`). Changing a template means adding a new version; history is never re-posted under new rules unless the user edits the document (ADR-0008). Golden files exist per version.
-3. **Balanced by construction.** `ledger::BalancedEntry` can only be built through `BalancedEntry::new(lines)`, which rejects an empty or one-line entry, a non-zero base sum, and, when every line has the same currency, a non-zero transaction sum (I-3). The storage layer re-checks the same rules at finalize (`journal_entry_finalize` trigger).
+3. **Balanced by construction.** `ledger::BalancedEntry` can only be built through `BalancedEntry::new(date, lines)`, which rejects an empty or one-line entry, a line whose amount and base amount are both zero, a repeated line key, a non-zero base sum, and, when every line has the same currency, a non-zero transaction sum (I-3). The storage layer re-checks the same rules at finalize (`journal_entry_finalize` trigger).
 4. **Entry date.** The entry date is the document date. A reversal takes the date of the entry it reverses (section 6).
 5. **Line keys.** Every posting carries a `line_key` that is stable across revisions of the same document:
 
@@ -118,9 +118,16 @@ Amounts are computed at entry time and stored on the document, then posted as st
 - Taxable subtotal `S_tax = Σ a_l` over taxable lines.
 - `D_tax = round_half_up(D × S_tax / S)` when `tax_after_discount = 1` and `S > 0`; otherwise `0`.
 - Tax base `B = S_tax − D_tax`.
-- `t_r = round_half_up(B × rate_percent(r) / 100)` for each rate of the document's tax code. Each component is rounded separately and the tax total is `Σt_r`. One `document_tax_line` row is stored per rate, recording `B` and `t_r`.
+- `t_r = round_tax(B × rate_percent(r) / 100)` for each rate of the document's tax code, where `round_tax` is the company's `rounding.tax` mode (section 8.1; default half up, away from zero). Each component is rounded separately and the tax total is `Σt_r`. One `document_tax_line` row is stored per rate, recording `B` and `t_r`.
 
-**Tax mode `inclusive`** (import fidelity only in MVP; the MVP UI enters exclusive documents). Line amounts include tax. `document_line.tax_minor` holds the tax inside each taxable line: the per-rate tax `t_r` is computed on the tax-inclusive base and allocated to taxable lines with the allocation function (section 8.2). Posting 2..n credits `a_l − tax_l` instead of `a_l`. Postings 1, n+1 and n+2 are unchanged, and `T = Σa_l − D`.
+**Tax mode `inclusive`** (import fidelity only in MVP; the MVP UI enters exclusive documents; imported documents keep the source's tax amounts, section 8.1). Line amounts include tax. When BooksCraft computes the tax:
+
+- Tax-inclusive base `G = S_tax − D_tax`; combined percentage `ρ = Σ rate_percent(r)`.
+- Net base `B = round_tax(G × 100 / (100 + ρ))`; tax total `t = G − B`.
+- Per rate, `t_r = allocate(t, [rate_percent(r) × 10,000 for each rate])` (section 7), so `Σt_r = t` exactly.
+- Per line, `document_line.tax_minor` = `tax_l = allocate(t, [a_l for each taxable line])`, so `Σtax_l = Σt_r`.
+
+Posting 2..n credits `a_l − tax_l` instead of `a_l`. Postings 1, n+1 and n+2 are unchanged, and `T = Σa_l − D`.
 
 **Tax mode `none`** writes no tax postings.
 
@@ -189,8 +196,10 @@ Cash refund of a sale without AR (QBO RefundReceipt). Mirror of the sales receip
 
 | # | Account | Contact | Dr | Cr | When | Line key |
 |---|---|---|---|---|---|---|
-| 1 | `MONEY` (bank or card) | | | `T` | `T > 0` | `{doc}:money` |
+| 1 | `MONEY` (bank, card or undeposited funds) | | | `T` | `T > 0` | `{doc}:money` |
 | 2.. | as credit memo postings 2..n+2 | | | | | |
+
+A refund paid out of undeposited funds is then a negative source line of a deposit (section 4.14), as QBO records it.
 
 ### 4.6 Customer refund
 
@@ -282,8 +291,8 @@ The bank deposit. It groups undeposited funds into one bank line and may add oth
 
 Validation:
 
-- A source document is a posted customer payment, sales receipt or vendor refund whose money account is undeposited funds.
-- The source amount `a_j` equals the source's money posting.
+- A source document is a posted customer payment, sales receipt or vendor refund (money in), or a refund receipt (money out, so `a_j < 0`), whose money account is undeposited funds.
+- The source amount `a_j` equals the source's money posting (signed).
 - A source sits in at most one posted deposit (trigger `document_line_single_deposit`).
 - `T = Σa_j + Σa_l >= 0`.
 
@@ -306,7 +315,7 @@ Postings equal the lines. Each line is an account, an optional contact, a signed
 
 A line to AR or AP is an open item for its contact.
 
-**Reversing journal entry.** The option "reverse on date X" creates, at posting time, a second journal entry document dated X. Its lines are negated, it is linked to the first, and it is posted in the same transaction (or queued as a `reversing_entry` job when X is in the future, then posted by the job as the same actor).
+**Reversing journal entry.** The option "reverse on date X" creates, at posting time, a second journal entry document dated X. Its lines are negated, it is linked to the first by a `document_link` row of type `reverses` (from the new entry to the original), and it is posted in the same transaction (or queued as a `reversing_entry` job when X is in the future, then posted by the job as the same actor).
 
 **Migration residual.** A journal entry with `is_residual = 1` is created only by the migrator. It closes a month-end trial balance difference against the source system (MIGRATION_SPEC section 6) and is flagged in every report that lists documents.
 
@@ -346,8 +355,8 @@ The `settlement` table is BooksCraft's form of QBO `LinkedTxn` between AR and AP
 Rules:
 
 1. **Rows are immutable.** A settlement is *active* while its event document is posted and still at `event_revision` (view `active_settlement`). Reposting the event document makes its old rows inactive and writes new ones. Voiding it makes them inactive.
-2. **Open amount** of document `X` on (account, contact) as of date `d` = `|Σ X's postings to that account and contact|` minus the active settlements dated on or before `d` in which `X` is the charge or the credit.
-3. **Bounds.** When an event document is posted, every touched document's open amount stays `>= 0`. Errors are `sales.application_exceeds_open` and `purchases.application_exceeds_open`.
+2. **Open amount** of document `X` on (account, contact) as of date `d` = `|Σ X's postings to that account and contact|` minus the active settlements dated on or before `d` in which `X` is the charge or the credit. Aging uses the as-of form; without a date, the open amount counts every active settlement.
+3. **Bounds.** When an event document is posted, every touched document's open amount, counting all its postings and every active settlement regardless of date, stays `>= 0`. Errors are `sales.application_exceeds_open` and `purchases.application_exceeds_open`. (So a payment dated before its invoice, rule 5, passes the bound.)
 4. **Same key.** Both sides share account, contact and currency.
 5. **Dates.** `settled_on` is the event document's date. Applying a payment dated before the invoice is allowed with warning `sales.payment_before_charge`; QBO data contains such pairs.
 6. **Voiding a charge or credit that others have settled** is refused (`document.has_active_settlements`) until those event documents are edited to drop the application. Voiding an event document is allowed and reopens what it settled.
@@ -361,14 +370,14 @@ Rules:
 | Delete draft | draft only | none | rows deleted (trigger `document_delete_draft_only`); audited |
 | Post | draft; actor may post (an `agent` never may, I-10) | original entry `E1` | lines copied to revision 1; `status = posted`, `revision = 1` |
 | Approve | draft created by `api` or `agent`; approver is a user with post permission | as Post | sets `approved_by_user_id`, `approved_at`; audit actions `approval.approve` then `document.post` |
-| Edit posted (repost) | posted; both the old and new dates pass the lock rules; reconciled money lines unchanged (section 11) | reversal `R_n` of `E_n`, dated `E_n`'s date, then original `E_{n+1}` dated the new document date | new lines at revision n+1; header updated; `revision = n+1` in the same transaction |
-| Void | posted; no other document's active settlement involves it; not in a posted deposit; reconciled money lines first unreconciled | reversal `R_n` dated `E_n`'s date | `status = voided`, `voided_at`, `void_reason`; content frozen |
+| Edit posted (repost) | posted; both the old and new dates pass the lock rules; reconciled money lines unchanged (section 11); not a source of a posted deposit (`books.source_in_posted_deposit`; remove it from the deposit first) | reversal `R_n` of `E_n`, dated `E_n`'s date, then original `E_{n+1}` dated the new document date | new lines at revision n+1; header updated; `revision = n+1` in the same transaction |
+| Void | posted; no other document's active settlement involves it; not a source of a posted deposit (`books.source_in_posted_deposit`); reconciled money lines first unreconciled | reversal `R_n` dated `E_n`'s date | `status = voided`, `voided_at`, `void_reason`; content frozen |
 
 Rules:
 
 1. A reversal posting has the same account, contact, currency, dimensions and line key as the original, with negated amounts. Storage refuses a reversal whose postings do not cancel the original exactly, are dated differently, or target a non-final entry (`ledger.reversal_mismatch`, `ledger.reversal_target_not_final`). An entry is reversed at most once.
-2. Documents that write no entry (zero amounts) still move through the same statuses and revisions.
-3. A document dated in a hard-locked period cannot be edited or voided. The correction is a new document in an open period, for example a journal entry. Soft-locked periods need an override (section 9).
+2. Documents that write no entry (zero amounts) still move through the same statuses and revisions, and the lock rules apply to them as well (section 9).
+3. A document dated in a hard-locked period cannot be posted, edited or voided. The correction is a new document in an open period, for example a journal entry. Soft-locked periods need an override (section 9).
 4. Every state change appends an audit event in the same transaction (section 10).
 5. Imports post with `source = import`. The actor is the importing user and `via = import`.
 
@@ -392,21 +401,21 @@ BooksCraft stores one accrual ledger (I-4). Cash basis is computed at report tim
 | Cash settlement document | Customer payment, bill payment, customer refund, vendor refund | Money postings are recognized at the entry date. AR/AP postings are never recognized. For payments, the unapplied credit is recognized as a report line: **Unapplied customer payments** (income section, credit) or **Unapplied vendor payments** (expense section, debit). It is recognized at the payment date for the full amount and reduced by each settlement in which the payment is the credit, on that settlement's date. |
 | Accrual document | Any other document with AR or AP postings (invoice, credit memo, bill, vendor credit, JE or expense with AR/AP lines) | AR/AP postings are never recognized. Its other postings (the recognizable postings, weights `w`) are recognized only through the settlements in which it is a charge or a credit. |
 
-**Accrual-document recognition.** For accrual document `X` with recognizable postings `w`, take its active settlements in `(settled_on, id)` order. Let `cum_k` be the running total of settled amounts through settlement `k`. The recognized amount of each posting at settlement `k` is:
+**Accrual-document recognition.** For accrual document `X`, let `w` be its recognizable postings and `W = Σw`. Take its active settlements in `(settled_on, id)` order. For settlement `k` on (`account_k`, `contact_k`) with amount `s_k > 0`, let `σ_k` be the sign (+1 or −1) of the sum of `X`'s postings to (`account_k`, `contact_k`). The signed running total and the recognized amount of each posting at settlement `k` are:
 
 ```
-target(c) = -c if Σw < 0 else c
-recognized_k = allocate(target(cum_k), w) − allocate(target(cum_{k−1}), w)     (cum_0 = 0)
+cum_k = σ_1·s_1 + … + σ_k·s_k                                  (cum_0 = 0)
+recognized_k = allocate(−cum_k, w) − allocate(−cum_{k−1}, w)
 ```
 
-The result is recognized on `settled_on` of settlement `k`. Using cumulative allocation means a fully settled document recognizes exactly its accrual amounts, and the cents never drift.
+The result is recognized on `settled_on` of settlement `k`. When `X` is fully settled, `cum` equals the sum of `X`'s AR/AP postings, which is `−W`, so `X` recognizes exactly its accrual amounts and the cents never drift. Signing each settlement by its side keeps this true for a document with AR or AP postings in both directions, such as a journal entry with an AR line and an AP line. If `W = 0` (the recognizable postings net to zero), they are recognized in full on the date of `X`'s first active settlement.
 
 Consequences:
 
 - An invoice settled by a credit memo recognizes both the invoice's income and the credit memo's contra-income on the application date. They net to the credited amount.
 - Credit card charges are cash documents, recognized when charged.
 - Sales tax on invoices is recognized in proportion to payments.
-- On a cash-basis balance sheet, AR and AP are zero and every bank, card and other balance-sheet account matches accrual. Equity includes cash-basis net income. The balance sheet balances because every recognized amount is half of a balanced pair: the money side was recognized at its date and the income side through settlements, or both sides at the same date.
+- On a cash-basis balance sheet, AR and AP are zero. Accounts posted only by cash documents and by the money postings of cash settlement documents match accrual. Accounts that accrual documents post to follow recognition instead: sales tax payable, opening balance equity (through opening invoices and bills), and the money lines of journal entries or expenses with AR/AP lines. Equity includes cash-basis net income. The balance sheet balances because every recognized amount is half of a balanced pair: the money side was recognized at its date and the other side through settlements, or both sides at the same date.
 
 Cash-basis parity with QuickBooks is measured, not promised, in MVP (MIGRATION_SPEC section 6). Spine example: INV-1002 (5,097.70), paid 2,500.00 on 2026-03-13, recognizes Design Income 2,206.88, Print Sales 392.33, Discounts Given (129.96), state tax 23.30 and city tax 7.45. Together these are 2,500.00.
 
@@ -420,7 +429,7 @@ Cash-basis parity with QuickBooks is measured, not promised, in MVP (MIGRATION_S
 | Percent discount | `round_half_up(S × pct / 100)` |
 | Taxable share of a discount | `round_half_up(D × S_tax / S)` |
 | Tax per rate component | Company setting `rounding.tax`: `half_up` (default, away from zero) or `half_even`, applied to `B × rate / 100` |
-| Splitting one amount across lines (inclusive tax, cash basis, FX base amounts) | `allocate` (section 7), which leaves no residue |
+| Splitting one amount across lines (inclusive tax, cash basis) | `allocate` (section 7), which leaves no residue |
 | Imported documents | The source's amounts are stored as received and never recomputed. If an imported document's postings do not balance by up to ±2 minor units (source-side rounding), the difference posts to `ROUND` with line key `{doc}:rounding` and warning `import.rounding_adjusted`. A larger difference fails the document (`import.unbalanced_source`). |
 
 Computation uses exact decimals (`rust_decimal`) and integer minor units. `f32` and `f64` never appear in the money path (I-1).
@@ -441,8 +450,8 @@ Computation uses exact decimals (`rust_decimal`) and integer minor units. `f32` 
 | Rule | Detail |
 |---|---|
 | State | `company.hard_locked_through` ≤ `company.soft_locked_through` (either may be NULL). A date `d` is hard-locked if `d <= hard_locked_through`, soft-locked if not hard-locked and `d <= soft_locked_through`, otherwise open. Because both are single dates, a locked period can never follow an open one. |
-| Hard lock | No journal entry may be finalized with `entry_date` in a hard-locked period, with or without an override (trigger `period.hard_locked`). Documents dated there cannot be posted, edited or voided. |
-| Soft lock | An entry dated in a soft-locked period is finalized only if a `lock_override` row (reason of 5 or more characters, actor) exists for it. The service writes the override, and the audit event `period.override`, only for users with the `period.override` permission (owner, admin, accountant). |
+| Hard lock | No journal entry may be finalized with `entry_date` in a hard-locked period, and no settlement may be written with `settled_on` there, with or without an override (triggers `journal_entry_finalize` and `settlement_hard_lock`, `period.hard_locked`). Documents dated there cannot be posted, edited or voided, including documents that write no entry (zero-amount payments); the services check the document date before writing. |
+| Soft lock | An entry dated in a soft-locked period is finalized only if a `lock_override` row (reason of 5 or more characters, actor) exists for it. The service writes the override, and the audit event `period.override`, only for users with the `period.override` permission (owner, admin, accountant). A document that writes no entry has no entry to attach a `lock_override` row to: the service requires the same permission and reason and records them in the `period.override` audit event. |
 | Moving dates | `PUT period-locks` sets both dates in one audited command (`period.set_locks`, before and after values, reason required). Moving `hard_locked_through` earlier (unlocking) requires the owner role and a reason (I-5: overrides are audited). |
 | Closing | No closing entries. Net income of prior fiscal years is presented as Retained Earnings on the balance sheet at report time, and the current fiscal year's net income as "Net income" (brief §2.1; C-9). The trial balance therefore matches QuickBooks's, which also posts no closing entries. |
 | Fiscal year | `company.fiscal_year_start_month`. The year containing date `d` starts on the first day of that month on or before `d`. |
@@ -455,8 +464,8 @@ Computation uses exact decimals (`rust_decimal`) and integer minor units. `f32` 
 | Row | `seq` (gapless from 1), `id`, `occurred_at`, `actor_type` (user, api, agent), `actor_id`, `actor_name`, `via`, `action`, `entity_type`, `entity_id`, `before_json`, `after_json`, `reason`, `request_id`, `prev_hash`, `hash` |
 | Canonical form | JSON object of every column except `hash`. Keys are sorted, there is no insignificant whitespace, strings are UTF-8, integers are bare, and decimals and money are strings. `before_json` and `after_json` are embedded as parsed JSON. |
 | Hash | `hash = hex(SHA-256(prev_hash ‖ "\n" ‖ canonical_json))`. For `seq = 1`, `prev_hash` is 64 zeros. |
-| Ledger link | The `document.post` audit event's `after_json` includes each new journal entry's id and `content_hash`. `content_hash` = SHA-256 of the canonical JSON of the entry header plus its postings in `line_no` order. One chain therefore covers documents and ledger (C-4). |
-| Enforcement | Storage refuses update, delete, gaps and broken `prev_hash` links. The writer computes `hash`. `bookscraft verify` recomputes every hash and every journal entry `content_hash` and reports the first mismatch. It runs on every company open (quick mode checks the last 1,000 events) and in full on demand. |
+| Ledger link | The `document.post` (and repost and void) audit event's `after_json` includes each new journal entry's id and `content_hash`, and the revision's `settlements_hash`. `content_hash` = SHA-256 of the canonical JSON of the entry header plus its postings, each with its dimensions, in `line_no` order. `settlements_hash` = SHA-256 of the canonical JSON of the settlement rows the revision wrote, sorted by id (the hash of an empty array when it wrote none). One chain therefore covers documents, ledger and the application graph (C-4). |
+| Enforcement | Storage refuses update, delete, gaps and broken `prev_hash` links. The writer computes `hash`. The store's write handle refuses to commit a company-file transaction that changed rows but appended no audit event (`audit.event_required`; exempt: `idempotency_key` rows and the migration runner). `bookscraft verify` recomputes every hash, every journal entry `content_hash` and every recorded `settlements_hash`, and reports the first mismatch. It runs on every company open (quick mode checks the last 1,000 events) and in full on demand. |
 | Limits | The chain is tamper-evident, not tamper-proof: whoever holds the file can rewrite it entirely (R-5). |
 
 ## 11. Reconciliation, clearing and bank review
@@ -466,18 +475,18 @@ Computation uses exact decimals (`rust_decimal`) and integer minor units. `f32` 
 | Accounts | Bank and credit card accounts are reconcilable; so is any balance-sheet account the user marks reconcilable (setting). |
 | Clearing state | Per (account, line key) on money-side postings: uncleared, cleared or reconciled. The latest `clearing_event` wins; no event means uncleared. Keyed by line key, so the state survives reposts (G-6). |
 | Start | One in-progress reconciliation per account. Beginning balance = ending balance of the last completed reconciliation for the account, or 0. |
-| Tick | Ticking adds a `reconciliation_line` (posting, amount, date) to the in-progress reconciliation and appends a `cleared` clearing event; unticking removes the line and appends `uncleared`. Candidate lines: final postings to the account dated on or before the statement date whose state is not reconciled. |
+| Tick | Ticking adds a `reconciliation_line` (line key, posting, amount, date) to the in-progress reconciliation and appends a `cleared` clearing event; unticking removes the line and appends `uncleared`. A candidate is one line key on the account whose state is not reconciled and whose final postings dated on or before the statement date sum to a non-zero amount. Its amount is that net sum (after reposts, an original, its reversal and the new original net to the current amount); its posting and date are those of the line key's latest original posting. |
 | Complete | Allowed only when `beginning + Σticked = ending` exactly. The statement-date lines are frozen: `snapshot_hash` = SHA-256 of the canonical JSON of the sorted lines. Each line gets a `reconciled` clearing event. The reconciliation becomes immutable. |
 | Undo | Only the most recent completed reconciliation of an account. Requires a reason. Status becomes undone, and each of its lines gets a `cleared` clearing event. Audited. |
 | Editing a reconciled line | A repost or void that changes the account, base amount or entry date of a posting whose line key is reconciled is refused (`reconciliation.reconciled_line_changed`). The user may first unreconcile that single line with a reason, which appends an `uncleared` event and an audit event. The completed reconciliation then shows as discrepant (frozen lines ≠ current state) until a later reconciliation absorbs it. |
 | Cleared line edited | A cleared but unreconciled line whose amount, account or date changes on repost gets an `uncleared` event with reason `document edited`. |
-| Bank review | Imported lines start `for_review`. Actions are: match (to an existing money-side posting of the same account and amount, sign-adjusted; suggestions rank by amount equality, then date distance ≤ 10 days, then payee or reference similarity); add (create and post a document from the line, or a draft when the actor is an agent, I-10); exclude; undo. Match and add append a `cleared` clearing event for the money line. Undoing an add voids the created document. All actions are appended to `bank_txn_action`. |
-| Rules | `bank_rule` rows evaluated by ascending priority; first match wins. Conditions: payee, memo or amount with contains, equals, starts with, between, greater than or less than, against all or any. Actions: document type (expense, deposit, transfer), account, contact, memo, dimensions. With `auto_add = 1` the add is applied immediately (actor = the rule's author, `via = job`); otherwise it is a suggestion. |
+| Bank review | Imported lines start `for_review`. Actions are: match (to an existing money-side posting of the same account and amount, sign-adjusted; suggestions rank by amount equality, then date distance ≤ 10 days, then payee or reference similarity); add (create and post a document from the line, or a draft when the principal may not post, which includes every agent, I-10); exclude; undo. Match and add append a `cleared` clearing event for the money line. Undoing an add voids the created document. All actions are appended to `bank_txn_action`. |
+| Rules | `bank_rule` rows evaluated by ascending priority; first match wins. Conditions: payee, memo or amount with contains, equals, starts with, between, greater than or less than, against all or any. Actions: document type (expense, deposit, transfer), account, contact, memo, dimensions. With `auto_add = 1` the add is applied immediately (actor = the rule's `author_user_id`, `via = job`); otherwise it is a suggestion. |
 | Dedupe | `UNIQUE (account_id, external_id)` for FITID or provider ids. Lines without an id use `dedupe_hash = SHA-256(account_id ‖ posted_date ‖ amount ‖ normalized payee ‖ normalized memo ‖ ordinal)`, where `ordinal` is the occurrence index of an identical tuple within the file. A re-import inserts nothing (I-7). |
 
 ## 12. Reports derived from the ledger
 
-Every report is a query over `ledger_line` (final postings), `active_settlement` and the document tables, run on accrual or cash basis (section 7). Nothing derived is stored.
+Every report is a query over `ledger_line` (final postings), `active_settlement` and the document tables. Nothing derived is stored. The trial balance, profit and loss, balance sheet, general ledger and sales tax liability run on accrual or cash basis (section 7); the journal, the agings and the audit log have no basis.
 
 | Report | Definition |
 |---|---|
@@ -504,23 +513,24 @@ Each statement is failable. The **Test** column names the planned test, its crat
 | I-2 | `posting` and `ledger` have no I/O dependencies (no tokio, rusqlite, reqwest, std::fs or std::net use). | T-POST-2 `cargo xtask lint` pure-crate rule | xtask / W0-01 |
 | I-2 | Every MVP document type has a golden file per rules version, and every journal entry stores a `rules_version`. | T-POST-3 insta golden suite plus schema NOT NULL | posting / W1-01 |
 | I-3 | `BalancedEntry` cannot be constructed from unbalanced or one-line input. | T-LEDGER-1 proptest plus the constructor being the only public way to build one | ledger / W0-05 |
-| I-3 | Storage refuses to finalize an unbalanced entry, to update or delete final postings or entries, or to add postings to a final entry. | T-STORE-1..4 (DATA_MODEL.md §6 cases 1–4; every other case there is T-STORE-n for case n) | store / W0-04 |
-| I-3 | A reversal exactly cancels its original; an entry is reversed at most once. | T-LEDGER-2 proptest at the type level plus T-STORE-6 trigger test | ledger, store / W0-05, W0-04 |
+| I-3 | Storage refuses to finalize an unbalanced entry, to update or delete final postings, their dimensions or final entries, or to add postings or dimensions to a final entry. | T-STORE-1..4 (DATA_MODEL.md §6 cases 1–4; every other case there is T-STORE-n for case n) | store / W0-04 |
+| I-3 | A reversal exactly cancels its original, dimension for dimension; an entry is reversed at most once. | T-LEDGER-2 proptest at the type level plus T-STORE-6 trigger test | ledger, store / W0-05, W0-04 |
 | I-3 | Random sequences of documents, edits and voids keep the trial balance at 0 and the balance sheet balanced. | T-PROP-1 property test over the full service stack | tests/scenarios / W0-03 harness, active from W2 |
 | I-3 | A void is a reversal; posted documents are never deleted. | T-STORE-9 delete and status triggers plus T-SALES-1 void test | store, sales / W0-04, W2-01 |
 | I-4 | No table stores cash-basis amounts; the cash-basis trial balance balances; a fully settled document recognizes exactly its accrual amounts. | T-REP-1 schema scan plus proptest | reports / W2-04 |
 | I-4 | The spine's cash-basis P&L equals Appendix A. | T-SPINE-CASH golden | tests/scenarios / W0-03 |
-| I-5 | Entries dated on or before the hard-lock date are refused even with an override; soft-locked dates need an override row. | T-STORE-12 trigger tests | store / W0-04 |
+| I-5 | Entries dated on or before the hard-lock date, and settlements settled then, are refused even with an override; soft-locked dates need an override row. | T-STORE-12 trigger tests | store / W0-04 |
+| I-5 | A zero-amount payment (no journal entry) cannot be posted or voided in a hard-locked period, and in a soft-locked period needs the `period.override` permission and a reason, recorded in the `period.override` audit event. | T-SALES-3 (customer payment), T-PURCH-1 (bill payment) | sales, purchases / W2-01, W2-02 |
 | I-5 | Lock changes and overrides each append an audit event; moving the hard lock earlier requires owner role plus reason. | T-BOOKS-1 | books / W1-02 |
-| I-6 | Audit rows cannot be updated or deleted; sequence gaps and broken links are refused. | T-STORE-13 | store / W0-04 |
-| I-6 | `verify` detects a modified `after_json`, a modified posting amount (with triggers dropped) and a removed event. | T-STORE-19 | store / W0-04 |
+| I-6 | Audit rows cannot be updated or deleted; sequence gaps and broken links are refused; a company-file write that appends no audit event cannot commit. | T-STORE-13 | store / W0-04 |
+| I-6 | `verify` detects a modified `after_json`, a modified posting amount or posting dimension, a modified settlement amount (with triggers dropped) and a removed event. | T-STORE-19 | store / W0-04 |
 | I-6 | Every mutating service command appends at least one audit event with the correct actor type and `via`. | T-AUDIT-1 harness assertion used by every service test | test-support / W0-03 |
-| I-7 | Importing the same QBO data, IIF or CSV twice creates no duplicates and reports the second run as all-duplicate. | T-MIG-1 | migrate / W3-04 |
+| I-7 | Importing the same QBO data, CSV lists or interchange bundle twice creates no duplicates and reports the second run as all-duplicate. | T-MIG-1 | migrate / W3-04 (CSV, interchange), W4-03 (QBO API) |
 | I-7 | Re-importing an OFX file inserts no bank lines; CSV lines without FITID dedupe by hash and ordinal. | T-BANK-1 | banking / W2-03 |
 | I-8 | 200 dimensions can be created, and a dimension can hold 1,000 values (each created through the service, with its audit event); no count limit exists anywhere; line dimensions propagate to postings. | T-BOOKS-2, the `count-limits` lint, and T-POST-4 golden | books, xtask, posting / W1-02, W0-01, W1-01 |
 | I-9 | 2,000 accounts, 100 users, 200 dimensions and 200 custom fields can be created with no limit error; no `MAX_*` count limit exists. | T-LIMIT-1 integration test plus lint | books, identity / W1-02, W1-03 |
-| I-10 | An `agent` token cannot post, void, approve, delete or change locks: every such endpoint returns 403 `auth.agent_forbidden`; agent-created documents are drafts. | T-API-1 | api / W1-05 |
-| I-10 | No MCP tool posts, voids, approves, deletes or moves money; agent tokens cannot be granted `books:write`. | T-MCP-1 tool-list snapshot plus T-ID-2 | mcp, identity / W5-02, W1-03 |
+| I-10 | An `agent` token cannot post, void, approve, delete drafts it did not create, or change locks: every such endpoint returns 403 `auth.agent_forbidden`; agent-created documents are drafts. | T-API-1 | api / W1-05 |
+| I-10 | No MCP tool posts, voids, approves, deletes drafts it did not create, or moves money; agent tokens cannot be granted `books:write`. | T-MCP-1 tool-list snapshot plus T-ID-2 | mcp, identity / W5-02, W1-03 |
 | I-10 | Approval stores the approver and appends `approval.approve`. | T-BOOKS-3 | books / W1-02 |
 | I-11 | No API operation or MCP tool processes payroll, moves money or files taxes; payment SDK crates are banned in `deny.toml`. | T-SCOPE-1 OpenAPI path denylist test plus cargo-deny bans | api, xtask / W1-05, W0-01 |
 | I-12 | `cargo deny check licenses` passes; MIT crates depend only on MIT workspace crates and permissive externals; every source file has the right SPDX header. | T-LIC-1, T-LIC-2, T-LIC-3 | xtask, CI / W0-01 |
@@ -533,11 +543,12 @@ Derived ledger rules used by tests:
 
 | ID | Statement | Test |
 |---|---|---|
-| L-1 | For every posted document, the sum of its current entry's AR/AP postings per contact equals its open amount plus its active settlements. | T-PROP-1 |
+| L-1 | For every posted document and every (account, contact) it posts AR or AP to, `|Σ` its current entry's postings to that pair`|` equals its open amount on that pair (all dates) plus its active settlements on that pair. | T-PROP-1 |
 | L-2 | A deposit's money posting equals the sum of its source postings plus other lines. | T-BANK-2 |
 | L-3 | Completing a reconciliation requires a zero difference, and its `snapshot_hash` recomputes. | T-BANK-3 |
 | L-4 | The reconciled-line edit rule refuses a changed reconciled posting and allows an unchanged one. | T-BANK-4 |
 | L-5 | A zero-amount payment applying a credit writes no journal entry and moves both open amounts. | T-SALES-2 |
+| L-6 | Repost and void refuse a document that is a source of a posted deposit (`books.source_in_posted_deposit`). | T-BOOKS-4 |
 
 ## Appendix A: scenario spine (Copperline Studio, March 2026)
 
