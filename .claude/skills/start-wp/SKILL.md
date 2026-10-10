@@ -30,7 +30,7 @@ Use the branch name from the OWNERSHIP row.
 ## 4. Pick up earlier work
 
 1. If `docs/coordination/handoffs/$0.md` exists on the branch, read it. Start from its **Next** list. Its **Do not redo** list is binding.
-2. Look for an open pull request: `gh api "repos/S0r81/bookscraft/pulls?head=S0r81:<branch>&state=open" --jq '.[] | [.number, .html_url] | @tsv'`. If there is one, read its description and comments (`gh api repos/S0r81/bookscraft/issues/<number>/comments --jq '.[].body'`).
+2. Look for an open pull request: `gh api repos/S0r81/bookscraft/pulls --method GET -f head=S0r81:<branch> -f state=open --jq '.[] | [.number, .html_url] | @tsv'`. If there is one, read its description and comments (`gh api repos/S0r81/bookscraft/issues/<number>/comments --jq '.[].body'`).
 3. List the CCRs this work package already raised: `ls docs/coordination/CCR/CCR-$0-*.md`.
 
 ## 5. Read and plan

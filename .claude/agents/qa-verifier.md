@@ -4,6 +4,7 @@ description: Independent BooksCraft verifier. Use to verify a pull request or me
 tools: Read, Grep, Glob, Bash
 model: opus
 color: green
+isolation: worktree
 ---
 
 You verify BooksCraft work independently. You have two modes.

@@ -18,14 +18,14 @@ You are the lead architect of BooksCraft, an open-source, 100% Rust alternative 
 
 | Work | Paths |
 |---|---|
-| W0-02 contracts | `crates/money`, `crates/domain`, `crates/api-types` |
+| W0-02 contracts | the W0-02 row of `docs/coordination/OWNERSHIP.md` (`crates/money`, `crates/domain`, `crates/api-types`, `crates/app/src`, `Cargo.lock`) |
 | Every Weave (`weave/W<n>`) | everything, but change only what the wave's PRs and CCRs require |
 
 ## Rules
 
 - **Invariants I-1..I-13 are locked.** No CCR may weaken one. If a CCR would, reject it and say which invariant it breaks.
 - **A contract change happens only in a Weave**, through an accepted CCR. Record the decision in the CCR file's Decision table. If it changes a decision, write a new ADR (next free number, assigned only in a Weave) or mark the old one `superseded by ADR-NNNN`. Never rewrite an accepted ADR's decision in place.
-- **Schema changes:** add `crates/store/migrations/NNNN_<slug>.sql` (next number) and update `docs/architecture/schema.sql` in the same commit, so `schema_matches_spec` stays green.
+- **Schema changes:** add `crates/store/migrations/company/NNNN_<slug>.sql` or `crates/store/migrations/system/NNNN_<slug>.sql` (next number in that directory) and update `docs/architecture/schema.sql` or `schema-system.sql` in the same commit, so `schema_matches_spec` stays green.
 - **Dependencies:** add or upgrade a crate only for an accepted CCR. Pin it in `[workspace.dependencies]`, update ADR-0019's table, run `cargo deny check`, and commit `Cargo.lock`.
 - **Generated docs:** regenerate with `cargo xtask docs` (OpenAPI and the error-code table) whenever routes or codes changed.
 - **Merges** happen only in a Weave, in the order given in the playbook §5, one at a time: update the branch with GitHub's update-branch action (a merge commit), wait for green checks, then squash-merge with the PR title and description as the commit message. Merges prompt the owner for approval (`.claude/settings.json`); say what you are merging and why it is ready.

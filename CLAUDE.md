@@ -47,7 +47,7 @@ Always pass `--locked`. Prefer `-p <crate>` while iterating; full-workspace buil
 
 | Command | Use |
 |---|---|
-| `cargo xtask doctor` | Toolchain, components, targets, tools present? (`--fix` installs) |
+| `cargo xtask doctor` | Toolchain, components, targets, tools present? (`--fix` installs components and targets; `--tools` installs the pinned cargo tools) |
 | `cargo check --locked -p bookscraft-<crate> --all-targets` | Fast feedback |
 | `cargo test --locked -p bookscraft-<crate>` | Your crate's tests |
 | `cargo clippy --locked -p bookscraft-<crate> --all-targets -- -D warnings` | Lints, warnings are errors |
@@ -127,7 +127,7 @@ Build compatibility only from Intuit's public API documentation and published fi
 - Never use `f32`/`f64` for money, or `REAL`/`NUMERIC` columns.
 - Never update or delete postings, journal entries, audit events, settlements, clearing events or bank history.
 - Never let an `agent` principal post, approve, void or move money.
-- Never add a dependency (CCR only), and never run `cargo update`.
+- Never add a dependency (CCR only), and never run `cargo update` (exception: a Weave applying a version bump runs `cargo update --workspace`, which touches only workspace members).
 - Never use `std::process::Command` outside `xtask`, or `cfg(target_os)` outside `crates/platform`.
 - Never write JavaScript, TypeScript, Python or shell scripts, or use npm, npx or node. The only exception is `.claude/hooks/session-start.sh` (ADR-0030).
 - Never commit secrets, tokens, real customer data or `.env` files.

@@ -14,5 +14,5 @@ description: Write a handoff note so another session can continue the current Bo
    4. **Open problems:** failing tests (name and one line of the error), unknowns, CCRs raised (links).
    5. **Do not redo:** decisions already taken in this work package and why.
 4. Commit it as `docs(<WP>): handoff note` and push: `git push -u origin <branch>`.
-5. If a pull request is open (`gh api "repos/S0r81/bookscraft/pulls?head=S0r81:<branch>&state=open" --jq '.[0].number'`), comment on it with a link to the note: `gh api repos/S0r81/bookscraft/issues/<number>/comments -X POST -f body="Handoff: docs/coordination/handoffs/<WP>.md at <commit>"`.
+5. If a pull request is open (`gh api repos/S0r81/bookscraft/pulls --method GET -f head=S0r81:<branch> -f state=open --jq '.[0].number'`), comment on it with a link to the note: `gh api repos/S0r81/bookscraft/issues/<number>/comments -X POST -f body="Handoff: docs/coordination/handoffs/<WP>.md at <commit>"`.
 6. End with the note's **Next** list and this line for the owner: "Continue in a new session with `/start-wp <WP>`."

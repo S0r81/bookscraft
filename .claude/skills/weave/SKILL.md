@@ -17,8 +17,8 @@ Work as `lead-architect`: read `.claude/agents/lead-architect.md`, then the Weav
 ## 2. Collect
 
 1. List the wave's open pull requests:
-   `gh api "repos/S0r81/bookscraft/pulls?state=open&per_page=100" --jq '.[] | select(.head.ref | startswith("wp/W$0-")) | [.number, .head.ref, .head.sha, .title] | @tsv'`
-2. For each one, read its checks (`gh api "repos/S0r81/bookscraft/commits/<sha>/check-runs?per_page=100" --jq '.check_runs[] | [.name, .conclusion] | @tsv'`) and its files (`gh api "repos/S0r81/bookscraft/pulls/<number>/files?per_page=100" --jq '.[].filename'`), and note the CCR files it adds.
+   `gh api repos/S0r81/bookscraft/pulls --method GET -f state=open -f per_page=100 --jq '.[] | select(.head.ref | startswith("wp/W$0-")) | [.number, .head.ref, .head.sha, .title] | @tsv'`
+2. For each one, read its checks (`gh api repos/S0r81/bookscraft/commits/<sha>/check-runs --method GET -f per_page=100 --jq '.check_runs[] | [.name, .conclusion] | @tsv'`) and its files (`gh api repos/S0r81/bookscraft/pulls/<number>/files --method GET -f per_page=100 --jq '.[].filename'`), and note the CCR files it adds.
 3. A work package without a pull request, or with red checks: ask the owner whether to wait for it or defer it (BOARD `blocked`, with the reason).
 
 ## 3. Verify
@@ -27,7 +27,7 @@ For each pull request, spawn a fresh `qa-verifier` subagent and give it only the
 
 ## 4. Decide CCRs
 
-For each CCR raised in the wave: accept, reject or supersede it, with a reason. A blocking CCR that a work package needs before it can pass is implemented first, in its own Weave pull request, so that work package can merge `origin/main` and finish. Fill in each CCR's Decision table on the Weave branch.
+For each CCR raised in the wave: accept, reject or supersede it, with a reason. A blocking CCR that a work package needs before it can pass is implemented first, in its own Weave pull request titled `Weave $0 (interim): <summary>`, so that work package can merge `origin/main` and finish. Only the pull request that closes the wave is titled `Weave $0: <summary>`, because later prompts check for that title. Fill in each CCR's Decision table on the Weave branch.
 
 ## 5. Merge, one pull request at a time
 
