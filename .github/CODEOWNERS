@@ -20,8 +20,7 @@
 /.github/workflows/**  @S0r81
 /xtask/**  @S0r81
 /crates/**  @S0r81
-/tests/scenarios/Cargo.toml  @S0r81
-/tests/scenarios/src/lib.rs  @S0r81
+/tests/scenarios/**  @S0r81
 /tests/e2e/**  @S0r81
 
 # W0-02 lead-architect

@@ -16,7 +16,7 @@ Every WP also owns two coordination files, which are not repeated in the rows:
 
 | WP | Wave | Agent | Branch | Owned paths |
 |---|---|---|---|---|
-| W0-01 | 0 | platform-release-engineer | wp/W0-01-workspace | `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/**`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, `deny-mit.toml`, `.gitattributes`, `.gitignore`, `.github/workflows/**`, `xtask/**`, `crates/**`, `tests/scenarios/Cargo.toml`, `tests/scenarios/src/lib.rs`, `tests/e2e/**` |
+| W0-01 | 0 | platform-release-engineer | wp/W0-01-workspace | `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/**`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, `deny-mit.toml`, `.gitattributes`, `.gitignore`, `.github/workflows/**`, `xtask/**`, `crates/**`, `tests/scenarios/**`, `tests/e2e/**` |
 | W0-02 | 0 | lead-architect | wp/W0-02-contracts | `crates/money/**`, `crates/domain/**`, `crates/api-types/**`, `crates/app/src/**`, `Cargo.lock` |
 | W0-03 | 0 | qa-verifier | wp/W0-03-spine | `crates/test-support/**`, `tests/scenarios/**`, `Cargo.lock` |
 | W0-04 | 0 | storage-engineer | wp/W0-04-store | `crates/store/**`, `Cargo.lock` |
@@ -88,9 +88,9 @@ The rows above are authoritative. No row in Waves 1–5 covers the paths below, 
 |---|---|
 | Migrations | Only a Weave adds `crates/store/migrations/NNNN_<slug>.sql`, numbered sequentially, and updates `docs/architecture/schema.sql` in the same commit. A builder that needs a schema change raises a CCR containing the proposed SQL and stops that line of work. |
 | Feature registration | Services register through their fixed `build` constructor and `CAPABILITIES` const (ARCHITECTURE.md §4.4–4.5). A builder adds capabilities only in its own crate, and only when the feature is complete and tested. |
-| Error enums | Error codes are constants in the owning crate, inside its namespace (API.md §4). There are no shared error enums to edit. `cargo xtask lint` rejects a duplicate code string. The API.md code table is regenerated only in a Weave (`cargo xtask docs`). |
+| Error enums | Error codes are constants in the owning crate, inside its namespace (API.md §4). There are no shared error enums to edit. `cargo xtask lint` rejects a duplicate code string. The code table `docs/architecture/error-codes.md` is regenerated only in a Weave (`cargo xtask docs`). |
 | UI routes | `crates/ui/src/routes.rs` lists every MVP route (W2-05). A page WP fills only its own `pages/<area>/` directory and never edits `routes.rs`. A missing route or shared component is a CCR; until it is resolved, the WP builds a local component inside its own directory. |
 | HTTP routes | `crates/api/src/routes/mod.rs` merges every area module (W1-05). An area WP edits only its own `routes/<area>.rs`. |
 | `Cargo.lock` | Changes only in W0-01, in Wave 0 WPs listed above, and in Weaves. Every command uses `--locked`, so an accidental change fails fast. A dependency need is a CCR. |
 | Coordination files | Builders never edit `BOARD.md` or `OWNERSHIP.md`. Each WP writes only its own CCR and handoff files, so concurrent PRs never touch the same coordination file. |
-| Docs generated from code | `docs/architecture/openapi.json` is written by W1-05, then only by `cargo xtask docs` in a Weave. CI checks that it is up to date from W1-05 on. |
+| Docs generated from code | `docs/architecture/openapi.json` is written by W1-05, then only by `cargo xtask docs` in a Weave; `docs/architecture/error-codes.md` only in Weaves. CI checks both on Weave PRs, so work package PRs never edit them and never conflict over them. |

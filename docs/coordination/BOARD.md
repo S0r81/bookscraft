@@ -17,7 +17,7 @@ States: `planned` → `ready` (dependencies merged) → `in_progress` (session s
 | W1-02 | 1 | Books service | ledger-engineer | wp/W1-02-books | — | planned | |
 | W1-03 | 1 | Identity | api-engineer | wp/W1-03-identity | — | planned | security review in Weave 1 |
 | W1-04 | 1 | Interchange, OFX and IIF libraries | import-migration-engineer | wp/W1-04-formats | — | planned | |
-| W1-05 | 1 | API framework, composition root, company, identity and books routes | api-engineer | wp/W1-05-api | — | planned | |
+| W1-05 | 1 | API framework, composition root, company, identity and books routes | api-engineer | wp/W1-05-api | — | planned | security review in Weave 1 |
 | W1-W | 1 | Weave 1 | lead-architect | weave/W1 | — | planned | |
 | W2-01 | 2 | Sales service and routes | ledger-engineer | wp/W2-01-sales | — | planned | |
 | W2-02 | 2 | Purchases service and routes | ledger-engineer | wp/W2-02-purchases | — | planned | |
@@ -28,17 +28,17 @@ States: `planned` → `ready` (dependencies merged) → `in_progress` (session s
 | W3-01 | 3 | UI: sales screens | ui-engineer | wp/W3-01-ui-sales | — | planned | |
 | W3-02 | 3 | UI: purchases and banking screens | ui-engineer | wp/W3-02-ui-purchases-banking | — | planned | |
 | W3-03 | 3 | QBO mapper (MIT) | import-migration-engineer | wp/W3-03-qbo-mapper | — | planned | |
-| W3-04 | 3 | Migration pipeline, CSV lists, parity validation, rollback, export | import-migration-engineer | wp/W3-04-migrate | — | planned | |
-| W3-05 | 3 | Platform services and desktop shell | platform-release-engineer | wp/W3-05-desktop | — | planned | owner verifies on Fedora |
+| W3-04 | 3 | Migration pipeline, CSV lists, parity validation, rollback, export | import-migration-engineer | wp/W3-04-migrate | — | planned | security review in Weave 3 |
+| W3-05 | 3 | Platform services and desktop shell | platform-release-engineer | wp/W3-05-desktop | — | planned | owner verifies on Fedora; security review in Weave 3 |
 | W3-W | 3 | Weave 3 | lead-architect | weave/W3 | — | planned | |
 | W4-01 | 4 | UI: reports, close, audit, migration wizard | ui-engineer | wp/W4-01-ui-reports-close | — | planned | |
 | W4-02 | 4 | Server composition and CLI | api-engineer | wp/W4-02-cli | — | planned | |
-| W4-03 | 4 | QBO connector | import-migration-engineer | wp/W4-03-qbo-connector | — | planned | needs the owner's Intuit app for live checks |
-| W4-04 | 4 | Render: PDF, preview, email | api-engineer | wp/W4-04-render | — | planned | |
+| W4-03 | 4 | QBO connector | import-migration-engineer | wp/W4-03-qbo-connector | — | planned | needs the owner's Intuit app for live checks; security review in Weave 4 |
+| W4-04 | 4 | Render: PDF, preview, email | api-engineer | wp/W4-04-render | — | planned | security review in Weave 4 |
 | W4-05 | 4 | Bank feeds: SimpleFIN and credential storage | bank-feeds-engineer | wp/W4-05-bank-feeds | — | planned | security review in Weave 4 |
 | W4-W | 4 | Weave 4 | lead-architect | weave/W4 | — | planned | |
-| W5-01 | 5 | Linux packaging and release workflow | platform-release-engineer | wp/W5-01-packaging | — | planned | |
-| W5-02 | 5 | MCP server (MVP stretch) | api-engineer | wp/W5-02-mcp | — | planned | may slip to v1 |
+| W5-01 | 5 | Linux packaging and release workflow | platform-release-engineer | wp/W5-01-packaging | — | planned | owner checks rpm and Flatpak on Fedora |
+| W5-02 | 5 | MCP server (MVP stretch) | api-engineer | wp/W5-02-mcp | — | planned | may slip to v1; security review in Weave 5 |
 | W5-03 | 5 | UI: print, email, polish, accessibility pass | ui-engineer | wp/W5-03-ui-print-polish | — | planned | |
-| W5-04 | 5 | End-to-end suite, pilot runbook, release checklist | qa-verifier | wp/W5-04-e2e-pilot | — | planned | |
-| W5-W | 5 | Weave 5 and MVP release candidate | lead-architect | weave/W5 | — | planned | full security review |
+| W5-04 | 5 | End-to-end suite, pilot runbook, release checklist | qa-verifier | wp/W5-04-e2e-pilot | — | planned | owner runs the sandbox pilot |
+| W5-W | 5 | Weave 5 and the MVP release | lead-architect | weave/W5 | — | planned | part A: full security review, `v0.1.0-rc.N`, M-WM prompts; part B (`weave/W5-2`): `v0.1.0` after the owner's pilot |
