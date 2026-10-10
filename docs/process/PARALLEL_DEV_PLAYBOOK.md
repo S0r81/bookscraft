@@ -156,7 +156,7 @@ Cold Rust builds take longer than the default two-minute command timeout.
 
 `.claude/settings.json` runs `.claude/hooks/session-start.sh` on every start and resume, locally and in the cloud. It installs rustup if a cloud VM lacks it, installs the toolchain named in `rust-toolchain.toml`, runs `cargo xtask doctor --fix`, and warms the build cache in the background. Before W0-01 merges, it only reports that the toolchain file does not exist yet.
 
-Other repository hooks: a guard that refuses edits outside the work package's owned paths on `wp/*` branches, `rustfmt` on every edited `.rs` file, and a fast `cargo check` of the changed crates before a session stops.
+Other repository hooks: a guard that refuses edits outside the work package's owned paths on `wp/*` branches, `rustfmt` on every edited `.rs` file, and a fast `cargo check` of the changed crates at the end of every turn (the Stop event), skipped at once when nothing changed since the last passing check.
 
 ### 2.5 GitHub from a cloud session
 
@@ -288,9 +288,9 @@ Start the Weave when every PR of the wave is green, or when you decide to defer 
 
 ### 5.3 Merge order
 
-1. The Weave's contract PR (accepted blocking CCRs), if there is one.
+1. The Weave's contract PR (accepted blocking CCRs), if there is one, titled `Weave <n> (interim): …`.
 2. The wave's work packages in the order listed in its Weave prompt: libraries before the services that use them, services before routes, routes before UI.
-3. The Weave PR that closes the wave.
+3. The Weave PR that closes the wave, titled `Weave <n>: …`. Later prompts check for exactly that title, so no other PR may use it.
 
 Each merge makes the next PR out of date, so each one runs CI again before it merges. That is the price of a `main` that is always green.
 
@@ -327,7 +327,7 @@ Never force-push, rebase shared branches, amend pushed commits or delete history
 |---|---|
 | A session ran out of context, crashed, or its sandbox restarted | Start a new session with `/start-wp <WP>`. It resumes the branch, the PR and the handoff note. Unpushed work is lost, which is why sessions push after every commit. |
 | A PR is behind `main` or has a conflict | The session runs `git merge origin/main`, resolves inside its owned paths, commits and pushes. A conflict outside its paths means a scope problem: CCR. |
-| `main` is red after a merge | The Weave opens a revert PR (`git revert <merge commit>` on a new branch), merges it, and sends the work package back to fix. |
+| `main` is red after a merge | The Weave opens a revert PR (`git revert <merge commit>` on a new branch `weave/W<n>-revert`, which the push rules and the `scope` check accept), merges it, and sends the work package back to fix. |
 | Wrong content merged | Same: a revert PR, never a force-push. |
 | The guard hook refuses an edit the work package needs | Either the work belongs to another WP (CCR), or OWNERSHIP.md is wrong (CCR to the Weave, which fixes the row). |
 | A work package must be abandoned | Close its PR with a reason, mark it `blocked` or deferred on the board in the next Weave, and delete the branch on GitHub (the proxy cannot delete branches). |

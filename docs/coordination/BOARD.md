@@ -16,7 +16,7 @@ States: `planned` → `ready` (dependencies merged) → `in_progress` (session s
 | W1-01 | 1 | Posting rules for every MVP document type | ledger-engineer | wp/W1-01-posting-rules | — | planned | |
 | W1-02 | 1 | Books service | ledger-engineer | wp/W1-02-books | — | planned | |
 | W1-03 | 1 | Identity | api-engineer | wp/W1-03-identity | — | planned | security review in Weave 1 |
-| W1-04 | 1 | Interchange, OFX and IIF libraries | import-migration-engineer | wp/W1-04-formats | — | planned | |
+| W1-04 | 1 | Interchange and OFX libraries | import-migration-engineer | wp/W1-04-formats | — | planned | |
 | W1-05 | 1 | API framework, composition root, company, identity and books routes | api-engineer | wp/W1-05-api | — | planned | security review in Weave 1 |
 | W1-W | 1 | Weave 1 | lead-architect | weave/W1 | — | planned | |
 | W2-01 | 2 | Sales service and routes | ledger-engineer | wp/W2-01-sales | — | planned | |
