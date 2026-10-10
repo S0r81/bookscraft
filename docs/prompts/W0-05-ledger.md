@@ -79,10 +79,10 @@ Out: the other document types' rules (W1-01), storage (W0-04), services.
 |---|---|---|
 | AC-1 | T-LEDGER-1: `BalancedEntry::new` accepts every balanced input and refuses every unbalanced, single-line, zero-line or duplicate-key input with the right code | proptest (at least 1,000 cases) plus one unit test per error code |
 | AC-2 | `BalancedEntry` has no other public constructor and no public mutable access | a `compile_fail` doctest that tries to build one with a struct literal; review of the public API in the PR |
-| AC-3 | T-LEDGER-2: a reversal cancels its original exactly, line by line | proptest: `entry` plus `entry.reversal()` sums to zero per account, contact, line key and currency |
+| AC-3 | T-LEDGER-2: a reversal cancels its original exactly, line by line, dimension for dimension | proptest: `entry` plus `entry.reversal()` sums to zero per account, contact, line key and currency, and each reversal line carries exactly its original line's dimensions |
 | AC-4 | `LockState` follows LEDGER_SPEC §9 | tests: a date on or before the hard date fails even with an override; a soft-locked date fails without an override and passes with one; open dates pass |
-| AC-5 | Journal entry golden: JE-01 (spine S26) posts Depreciation 100.00 Dr and Accumulated Depreciation 100.00 Cr with `rules_version` `journal_entry@1` | insta snapshot reviewed in the PR |
-| AC-6 | Opening balance golden: OB-1 (spine S02) posts Checking 12,500.00 Dr, Savings 20,000.00 Dr, Equipment 6,000.00 Dr, Studio Visa 450.00 Cr and Opening Balance Equity 38,050.00 Cr with line key `{doc}:ob` on the offset | insta snapshot reviewed in the PR |
+| AC-5 | Journal entry golden: JE-01 (spine S26) posts Depreciation 100.00 Dr and Accumulated Depreciation 100.00 Cr with `rules_version` `journal_entry@1` | a test asserts those postings and the rules version; the insta snapshot is kept for review |
+| AC-6 | Opening balance golden: OB-1 (spine S02) posts Checking 12,500.00 Dr, Savings 20,000.00 Dr, Equipment 6,000.00 Dr, Studio Visa 450.00 Cr and Opening Balance Equity 38,050.00 Cr with line key `{doc}:ob` on the offset | a test asserts those postings and the line key; the insta snapshot is kept for review |
 | AC-7 | A journal entry line to an AR account without a contact is refused | test expects `posting.invalid_contact` |
 | AC-8 | Dimensions propagate with line values winning over document values | unit test |
 | AC-9 | T-POST-1: posting is deterministic | proptest over 1,000 random journal entries and opening balances: two runs give byte-identical `serde_json` of the result |

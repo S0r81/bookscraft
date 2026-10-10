@@ -23,7 +23,7 @@ Read-only: everything else.
 
 1. `CLAUDE.md` and `.claude/agents/api-engineer.md`.
 2. `docs/architecture/ARCHITECTURE.md` §4.5 (`render::infra::mailer`), §4.6 (data access), §10 (print and PDF), §11 (terminology), §12 (jobs, email, rendering).
-3. `docs/architecture/API.md` §5.2 (email settings and test), §5.4 (`pdf`, `preview`, `send`).
+3. `docs/architecture/API.md` §5.1 (email settings and test), §5.4 (`pdf`, `preview`, `send`), §6 (`installation.manage`).
 4. ADR-0025 and ADR-0024.
 5. `docs/architecture/LEDGER_SPEC.md` §4.1 (the INV-1002 worked example).
 6. The merged `domain` render port and the document DTOs.
@@ -42,8 +42,8 @@ In:
 - **Typst world:** templates as data files in `crates/render/templates/` (`.typ`), a JSON data input generated from the stored document, embedded fonts (from `typst-kit`, or OFL-licensed files in `crates/render/fonts/` with their license texts), no system font scan, a fixed creation timestamp so output is reproducible.
 - **Template:** one sales-document template used by invoices, estimates, sales receipts, credit memos and refund receipts (title and fields per type, company details, addresses, lines, discount, tax by rate, totals, terms and due date, memo). Wording is BooksCraft's own; layout is original.
 - **Outputs:** PDF (`typst-pdf`) for download and email; SVG pages (`typst-svg`) for the in-app preview. Drafts render too (marked "Draft").
-- **Email:** `render::infra::mailer` returns `render::mail::Smtp` (lettre over TLS, settings from the system file or the desktop profile read at send time, password through `SecretStore`); `send` accepts posted documents only (drafts and voided documents get `render.not_sendable`) and enqueues an `email_send` job; `RenderService::run_job` renders the PDF, sends it as an attachment, and records `last_sent_at` with an audit event in one transaction; an SMTP failure returns `render.smtp_failed` so the store retries the job; the settings screen's test email runs through the same job kind.
-- **Routes:** `GET /documents/{id}/pdf`, `GET /documents/{id}/preview`, `POST /documents/{id}/send`, with permissions and OpenAPI metadata (API.md §5.4).
+- **Email:** the installation's SMTP settings (`email.get`, `email.set`, `email.test` at `/api/v1/settings/email`, permission `installation.manage`, stored in the system file's `setting` table with the password through `SecretStore`); `render::infra::mailer` returns `render::mail::Smtp` (lettre over TLS, reading those settings at send time); `send` accepts posted documents only (drafts and voided documents get `render.not_sendable`) and enqueues an `email_send` job; `RenderService::run_job` renders the PDF, sends it as an attachment, and records `last_sent_at` with an audit event in one transaction; an SMTP failure returns `render.smtp_failed` so the store retries the job; the settings screen's test email runs through the same job kind.
+- **Routes:** `GET /documents/{id}/pdf`, `GET /documents/{id}/preview`, `POST /documents/{id}/send` (API.md §5.4) and the email settings routes (API.md §5.1), all in `routes/render.rs`, with permissions and OpenAPI metadata.
 - **Capabilities:** `RenderPdf`, `Email` when complete.
 
 Out: report and statement PDFs (report screens print through the webview, ARCHITECTURE §10), the print and email UI (W5-03), provider email APIs (later).

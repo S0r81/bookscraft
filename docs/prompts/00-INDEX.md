@@ -19,7 +19,7 @@ Every prompt has exactly these sections, in this order:
 11. **Deliverables**: branch and PR title.
 12. **Stop conditions**: always including "needing to touch an unowned path means raise a CCR and stop that line of work".
 
-A merged WP is recognized by its squash commit title on `main`, which starts with `<WP>: ` (Weaves: `Weave <n>: `). Preconditions use that: `git log origin/main --format=%s | grep -q '^W0-02: '`.
+A merged WP is recognized by its squash commit title on `main`, which starts with `<WP>: `. Only the Weave pull request that closes wave `n` is titled `Weave <n>: …`; any other Weave pull request in that wave (a contract PR for blocking CCRs, or an interim Wave 0 merge) is titled `Weave <n> (interim): …`. Preconditions use these titles: `git log origin/main --format=%s | grep -q '^W0-02: '`, or `grep -q '^Weave 1: '` for a closed wave.
 
 ## All prompts
 
@@ -35,7 +35,7 @@ A merged WP is recognized by its squash commit title on `main`, which starts wit
 | W1-01 | 1 | Posting rules for every MVP document type | ledger-engineer | Weave 0 | [W1-01-posting-rules.md](W1-01-posting-rules.md) |
 | W1-02 | 1 | Books service | ledger-engineer | Weave 0 | [W1-02-books.md](W1-02-books.md) |
 | W1-03 | 1 | Identity | api-engineer | Weave 0 | [W1-03-identity.md](W1-03-identity.md) |
-| W1-04 | 1 | Interchange, OFX and IIF libraries | import-migration-engineer | Weave 0 | [W1-04-formats.md](W1-04-formats.md) |
+| W1-04 | 1 | Interchange and OFX libraries | import-migration-engineer | Weave 0 | [W1-04-formats.md](W1-04-formats.md) |
 | W1-05 | 1 | API framework, composition root, company, identity and books routes | api-engineer | Weave 0 | [W1-05-api.md](W1-05-api.md) |
 | W1-W | 1 | Weave 1 | lead-architect | W1-01..W1-05 PRs green | [W1-W-weave.md](W1-W-weave.md) |
 | W2-01 | 2 | Sales service and routes | ledger-engineer | Weave 1 | [W2-01-sales.md](W2-01-sales.md) |

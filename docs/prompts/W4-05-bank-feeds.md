@@ -14,8 +14,10 @@ Add live bank feeds behind the `BankProvider` trait in `crates/banking/src/feeds
 
 May modify:
 
-- `crates/banking/src/feeds/**`, `crates/banking/tests/feeds_*.rs`, `crates/banking/fixtures/simplefin/**`, `crates/api/src/routes/feeds.rs`
+- `crates/banking/src/feeds/**`, `crates/banking/src/lib.rs`, `crates/banking/tests/feeds_*.rs`, `crates/banking/fixtures/simplefin/**`, `crates/api/src/routes/feeds.rs`
 - `docs/coordination/CCR/CCR-W4-05-*.md`, `docs/coordination/handoffs/W4-05.md`
+
+In `crates/banking/src/lib.rs`, the only change allowed is adding `BankFeeds` to `CAPABILITIES`.
 
 Read-only: everything else, including the rest of `crates/banking` (W2-03's import, review and dedupe code: call it).
 
@@ -71,7 +73,7 @@ Fixtures are hand-written from the protocol documentation with invented institut
 |---|---|---|
 | AC-1 | The SimpleFIN adapter works against recorded fixtures | tests: claim, account list, transactions into `bank_txn`; a second sync of the same window adds 0 lines |
 | AC-2 | The rate limit holds | test with a fake clock: the 25th request in a day is refused without a network call |
-| AC-3 | No secret is serialized | test: the claimed access URL (a unique fixture string) appears in none of: logs, audit events, an interchange export, problem details, `Debug` output |
+| AC-3 | No secret is serialized | test: the claimed access URL (a unique fixture string) appears in none of: logs, audit events, the company file's bytes (so no export can contain it), problem details, `Debug` output |
 | AC-4 | A refused secret store is handled | test with a `SecretStore` whose `put` fails: connect returns `banking.credential_store_unavailable` and no `bank_feed` row exists afterwards |
 | AC-5 | Sync runs as a job with status | tests: `POST /sync` returns 202 and a job; a provider error is recorded on the feed and the job retries per the store's schedule |
 | AC-6 | Routes behave per API.md §5.5 | contract tests, including an agent token refused on connect, link, sync and disable |

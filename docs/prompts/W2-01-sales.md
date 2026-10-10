@@ -67,7 +67,8 @@ Out: printing and email (W4-04), UI (W3-01), deposits (W2-03), reports (W2-04).
 |---|---|
 | I-3 | T-SALES-1: a void writes a reversal and keeps the document; posted documents are never deleted |
 | I-3 | T-SALES-2 (L-5): a zero-amount payment applying a credit writes no journal entry and moves both open amounts |
-| I-3 | L-1: for each spine sales document, AR postings per contact equal open amount plus active settlements |
+| I-3 | L-1: for each spine sales document and each (AR account, contact) it posts to, the absolute sum of its postings equals its open amount (all dates) plus its active settlements |
+| I-5 | T-SALES-3: a zero-amount customer payment cannot be posted or voided in a hard-locked period, and needs the `period.override` permission and a reason in a soft-locked one |
 | I-6 | T-AUDIT-1 on every mutating command |
 | I-10 | agent drafts only; agent post refused (also covered by T-API-1 through the generic routes) |
 
@@ -78,13 +79,14 @@ Out: printing and email (W4-04), UI (W3-01), deposits (W2-03), reports (W2-04).
 | AC-1 | INV-1002 saved through the service stores subtotal 5,300.00, discount 265.00, tax lines 47.50 and 15.20 on a 760.00 base, total 5,097.70, and posts the §4.1 entry | service test |
 | AC-2 | Settlements follow LEDGER_SPEC §5 | tests: partial payment (PMT-02 leaves 2,597.70 open on INV-1002); over-application refused with `sales.application_exceeds_open`; another customer's invoice refused with `sales.application_mismatch`; PMT-03 leaves 500.00 unapplied; REF-01 refunds it |
 | AC-3 | T-SALES-1 and T-SALES-2 | tests |
-| AC-4 | Edit and void rules | tests: reposting an invoice below its applied amount fails with `sales.applied_amount_exceeds_total`; voiding a paid invoice fails with `document.has_active_settlements`; voiding the payment reopens the invoice |
-| AC-5 | Estimate conversion | test: converting an estimate creates a draft invoice with a `converted_from` link and the estimate's lines |
-| AC-6 | Agent rule | tests: an agent creates a draft invoice; creating a customer payment fails with `auth.agent_forbidden`; the owner approves the draft through the `books` helper |
-| AC-7 | T-AUDIT-1 | `assert_audited` in each mutating command's test |
-| AC-8 | Routes behave per API.md | contract tests per endpoint: create with `Idempotency-Key`, replace with `If-Match`, validation errors, a viewer's write refused |
-| AC-9 | The spine progresses without failures | `cargo xtask spine` reports 0 failed and at least 3 passed (S03 needs only `Invoices` beyond Wave 1) |
-| AC-10 | Lints pass and only owned paths changed | `cargo xtask lint` and `cargo xtask scope W2-01` exit 0 |
+| AC-4 | T-SALES-3: locks cover zero-amount payments | tests: a zero-amount payment applying a credit, dated on or before the hard-lock date, fails with `period.hard_locked` (post and void); dated in a soft-locked period, it fails with `period.soft_locked` for a bookkeeper and succeeds for an accountant with a reason, appending `period.override` |
+| AC-5 | Edit and void rules | tests: reposting an invoice below its applied amount fails with `sales.applied_amount_exceeds_total`; voiding a paid invoice fails with `document.has_active_settlements`; voiding the payment reopens the invoice |
+| AC-6 | Estimate conversion | test: converting an estimate creates a draft invoice with a `converted_from` link and the estimate's lines |
+| AC-7 | Agent rule | tests: an agent creates a draft invoice; creating a customer payment fails with `auth.agent_forbidden`; the owner approves the draft through the `books` helper |
+| AC-8 | T-AUDIT-1 | `assert_audited` in each mutating command's test |
+| AC-9 | Routes behave per API.md | contract tests per endpoint: create with `Idempotency-Key`, replace with `If-Match`, validation errors, a viewer's write refused |
+| AC-10 | The spine progresses without failures | `cargo xtask spine` reports 0 failed and at least 3 passed (S03 needs only `Invoices` beyond Wave 1) |
+| AC-11 | Lints pass and only owned paths changed | `cargo xtask lint` and `cargo xtask scope W2-01` exit 0 |
 
 ## Verify
 

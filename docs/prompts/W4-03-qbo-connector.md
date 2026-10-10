@@ -14,8 +14,10 @@ Build the QuickBooks Online API connector in `crates/migrate/src/qbo/`: pluggabl
 
 May modify:
 
-- `crates/migrate/src/qbo/**`, `crates/migrate/tests/qbo_*.rs`, `crates/migrate/fixtures/qbo_http/**`
+- `crates/migrate/src/qbo/**`, `crates/migrate/src/lib.rs`, `crates/migrate/tests/qbo_*.rs`, `crates/migrate/fixtures/qbo_http/**`
 - `docs/coordination/CCR/CCR-W4-03-*.md`, `docs/coordination/handoffs/W4-03.md`
+
+In `crates/migrate/src/lib.rs`, the only change allowed is adding `ImportQbo` to `CAPABILITIES`.
 
 Read-only: everything else, including the rest of `crates/migrate` (W3-04's pipeline), `crates/qbo` and `crates/api/src/routes/imports.rs`.
 
@@ -39,12 +41,12 @@ Read-only: everything else, including the rest of `crates/migrate` (W3-04's pipe
 
 In:
 
-- **Token sources:** a `TokenSource` with two implementations: authorization code with PKCE (server mode; state and verifier in `oauth_state` with a 10-minute single-use expiry; redirect `https://<server>/api/v1/companies/{cid}/imports/qbo/callback`) and pasted tokens (desktop). The owner's client id and secret come from the server config or desktop settings through `SecretStore`; BooksCraft ships no secret. Tokens are stored through `SecretStore` (purpose `qbo_oauth`), refreshed when expired, and deleted after the run unless the user keeps the connection.
-- **Reads:** `SELECT * FROM <Entity> STARTPOSITION n MAXRESULTS 1000` through the query endpoint, in MIGRATION_SPEC §4.2 order, with `minorversion` from configuration; `COUNT(*)` queries for the request estimate shown before starting.
+- **Token sources:** a `TokenSource` with two implementations: authorization code with PKCE (server mode; state and verifier in `oauth_state` with a 10-minute single-use expiry, bound to the user and company that started the connection, which is how the callback authenticates, API.md §5.7; redirect `https://<server>/api/v1/companies/{cid}/imports/qbo/callback`) and pasted tokens (desktop). The owner's client id and secret come from the server config or desktop settings through `SecretStore`; BooksCraft ships no secret. Tokens are stored through `SecretStore` (purpose `qbo_oauth`), refreshed when expired, and deleted after the run unless the user keeps the connection.
+- **Reads:** `SELECT * FROM <Entity> STARTPOSITION n MAXRESULTS 1000` through the query endpoint, in MIGRATION_SPEC §4.2 order, with `minorversion` from configuration; `COUNT(*)` queries for the request estimate (`ImportService::qbo_estimate`, API.md §5.7) shown before starting.
 - **Limits:** at most 4 concurrent requests and 300 per minute per realm; retry 429 and 5xx with exponential backoff from 1 to 32 seconds, 6 attempts.
-- **Reports:** month-end TrialBalance (accrual), AgedReceivables and AgedPayables at the last imported date (and at cut-over in cut-over mode), ProfitAndLoss on cash basis per month, converted into the pipeline's source-report inputs.
+- **Reports:** month-end TrialBalance (accrual), AgedReceivables and AgedPayables at the last imported date, ProfitAndLoss on cash basis per month, converted into the pipeline's source-report inputs. (Cut-over mode is v1; the MVP imports full history.)
 - **Attachments:** download through the Attachable temporary URL only from Intuit hosts; deduplicate by SHA-256.
-- **Wiring:** `ImportService`'s QBO methods (connect, callback, token, start with source `qbo_api`) call into this module; the run maps entities with `crates/qbo` and feeds the W3-04 pipeline; register `ImportQbo` when complete.
+- **Wiring:** `ImportService`'s QBO methods (connect, callback, token, estimate, start with source `qbo_api`) call into this module; the run maps entities with `crates/qbo` and feeds the W3-04 pipeline; register `ImportQbo` when complete.
 - **Fixtures:** hand-written HTTP exchanges in `crates/migrate/fixtures/qbo_http/` following the public reference, with invented companies and amounts (no real data, no Intuit sample data); a fake HTTP layer replays them in tests.
 - **Endpoint verification:** before relying on an endpoint name, parameter or `minorversion`, check Intuit's current documentation; list each fact and its source in the PR.
 

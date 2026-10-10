@@ -63,7 +63,7 @@ Out: resources and prompts (none in MVP), a stdio-to-server bridge (remote agent
 |---|---|
 | I-10 | T-MCP-1: the tool-list snapshot, plus the name-set check against API.md §8; an agent's draft cannot be posted through any tool, and posting it through the services as the agent returns `auth.agent_forbidden` |
 | I-6 | drafts created through MCP carry actor type `agent` and `via = mcp` in their audit events |
-| I-11 | no tool moves money (the name set excludes payments, refunds, deposits and transfers) |
+| I-11 | no tool moves money: the name set has no payment, refund, deposit or transfer tool, and a bank-line proposal is only a draft |
 
 ## Acceptance criteria
 
@@ -100,7 +100,7 @@ cargo xtask scope W5-02
 ## Stop conditions
 
 - Needing to touch an unowned path means raise a CCR (`/ccr`) and stop that line of work (a missing service operation, an rmcp feature that is not enabled, a CLI change).
-- A tool could reach post, approve, void, payments, refunds, deposits, transfers, locks, reconciliation, imports, exports, settings, users, tokens, bank feeds or secrets: stop; that breaks I-10 or I-11.
+- A tool could post, approve or void anything, create a payment or refund, create a deposit or transfer other than as a bank-line proposal draft, or reach locks, reconciliation, imports, exports, settings, users, tokens, bank feeds or secrets: stop; that breaks I-10 or I-11.
 - A locked invariant would be violated, or a precondition is false.
 - The same failure persists after two different fix attempts.
 - The timebox is reached: run `/handoff`.

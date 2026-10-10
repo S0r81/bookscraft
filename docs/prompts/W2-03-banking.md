@@ -6,7 +6,7 @@ Implement `BankingService` in `crates/banking` (deposits from undeposited funds,
 
 ## Wave and concurrency
 
-- Wave 2, batch A (with W2-01 and W2-02). Paths do not overlap. Live feeds come later (W4-05, inside `crates/banking/src/feeds/`): `BankingService`'s bank-feed operations and its `bank_sync` job handler delegate to functions in `feeds/mod.rs` that return `api.not_implemented` for W4-05 to fill in; `providers()` keeps returning an empty list.
+- Wave 2, batch A (with W2-01 and W2-02). Paths do not overlap. Live feeds come later (W4-05, inside `crates/banking/src/feeds/`): `BankingService`'s bank-feed operations and its `bank_sync` job handler delegate to functions in `feeds/mod.rs` that return `api.not_implemented` for W4-05 to fill in, each taking `&Ctx`, the service's `Stores` and `Infra`, and the operation's command or the job, so W4-05 never needs to change their signatures; `providers()` keeps returning an empty list.
 - Agent: `bank-feeds-engineer`.
 - Timebox: three sessions, then `/handoff`.
 

@@ -84,7 +84,7 @@ gh api repos/S0r81/bookscraft/branches/main/protection --jq '.required_status_ch
 ## Deliverables
 
 - Branch: `weave/W0` (a second Weave PR in the same wave uses `weave/W0-2`)
-- PR title: `Weave 0: <summary>`, for example `Weave 0: close Wave 0, accept ADR-0002, open Wave 1`
+- PR title: `Weave 0: <summary>` for the PR that closes Wave 0, for example `Weave 0: close Wave 0, accept ADR-0002, open Wave 1`; any earlier Weave 0 PR is titled `Weave 0 (interim): <summary>`
 
 ## Stop conditions
 

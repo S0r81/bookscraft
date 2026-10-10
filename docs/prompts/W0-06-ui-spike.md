@@ -43,7 +43,7 @@ In, inside `spikes/ui/`:
 - `spike-ui`: a Leptos 0.8 client-side app with three screens: a virtualized 10,000-row table with keyboard cell navigation (arrows, `Home`, `End`, `PageUp`, `PageDown`); a 20-line invoice form whose account cells use a type-ahead over the 500 accounts; and a print preview showing Typst-rendered SVG pages with a Print button. Every input is labelled; the grid and dialog have ARIA roles; a small overlay shows measured timings (first render, frames per second while scrolling, keystroke-to-render time) from the browser's Performance API.
 - `spike-desktop`: a Tauri 2 shell registering `bookscraft://` with `register_asynchronous_uri_scheme_protocol`, converting each request to an `http::Request`, calling the router with `tower::ServiceExt::oneshot`, and returning the buffered response; it opens no TCP port.
 - `spike-server`: an axum binary serving the same router and bundle on `127.0.0.1` for a browser.
-- `spike-build`: a Rust binary that compiles `spike-ui` for `wasm32-unknown-unknown`, runs `wasm-bindgen-cli-support` (the pinned version, as a library), writes the bundle plus a generated HTML host page into `spikes/ui/dist/` (git-ignored), and prints the SHA-256 of the `.wasm` file. No Trunk, no Node, no downloads at build time.
+- `spike-build`: a Rust binary that takes the `.wasm` file produced by `cargo build --locked --manifest-path spikes/ui/Cargo.toml -p spike-ui --target wasm32-unknown-unknown --release`, runs `wasm-bindgen-cli-support` on it (the pinned version, as a library), writes the bundle plus a generated HTML host page into `spikes/ui/dist/` (git-ignored), and prints the SHA-256 of the `.wasm` file. It starts no process (I-13: the wasm build is the explicit cargo command above). No Trunk, no Node, no downloads at build time.
 - `spikes/ui/RESULTS.md`: one row per criterion with pass, fail or not tested, the measurement, the environment (Fedora release, GNOME version, Wayland, NVIDIA driver version) and notes, including whether `WEBKIT_DISABLE_DMABUF_RENDERER=1` was needed.
 - ADR-0002: results summarized under "More Information"; `status: accepted` only if all eight criteria pass with the owner's confirmation in the PR; otherwise the status stays `proposed`, and the ADR says which criteria failed and whether the cause is the framework (rerun with Dioxus 0.7) or the webview (escalate to the owner, Slint as native fallback).
 
@@ -69,7 +69,7 @@ Out: any code under `crates/`, any production design or styling, accessibility b
 
 | Id | Criterion | How it is checked |
 |---|---|---|
-| AC-1 | Criterion 1: the spike builds with cargo alone | `cargo build --locked --manifest-path spikes/ui/Cargo.toml --workspace` and `cargo run --locked --manifest-path spikes/ui/Cargo.toml -p spike-build` exit 0; no `package.json`, `.js` or `.ts` file is tracked (`cargo xtask lint` passes) |
+| AC-1 | Criterion 1: the spike builds with cargo alone | `cargo build --locked --manifest-path spikes/ui/Cargo.toml --workspace`, `cargo build --locked --manifest-path spikes/ui/Cargo.toml -p spike-ui --target wasm32-unknown-unknown --release` and `cargo run --locked --manifest-path spikes/ui/Cargo.toml -p spike-build` exit 0; no `package.json`, `.js` or `.ts` file is tracked (`cargo xtask lint` passes) |
 | AC-2 | Criterion 8 (automated part): the desktop and the server serve the same bundle and both answer `/api/v1/ping` | a test in `spike-desktop` calls the protocol handler function directly (no window) for `/api/v1/ping` and for the `.wasm` file; a test in `spike-server` serves on `127.0.0.1:0`; both return 200 for ping and the same SHA-256 for the bundle |
 | AC-3 | The desktop shell opens no listening socket | the protocol path above uses no `TcpListener`; review in the PR shows the only listener is in `spike-server` |
 | AC-4 | Criteria 2–7 have a recorded result from the owner's Fedora machine | `spikes/ui/RESULTS.md` has a row for each with pass, fail or not tested, and for 3 and 5 the measured numbers against the thresholds (first screen under 500 ms, at least 50 fps, under 50 ms per keystroke) |
@@ -81,6 +81,7 @@ Out: any code under `crates/`, any production design or styling, accessibility b
 ```sh
 cargo build --locked --manifest-path spikes/ui/Cargo.toml --workspace
 cargo test --locked --manifest-path spikes/ui/Cargo.toml --workspace
+cargo build --locked --manifest-path spikes/ui/Cargo.toml -p spike-ui --target wasm32-unknown-unknown --release
 cargo run --locked --manifest-path spikes/ui/Cargo.toml -p spike-build
 cargo xtask lint
 cargo xtask scope W0-06

@@ -6,7 +6,7 @@ Build `crates/migrate` (except the QBO connector): the import pipeline from inte
 
 ## Wave and concurrency
 
-- Wave 3, batch A (with W3-03 and W3-05). Paths do not overlap; the QBO connector comes later in `crates/migrate/src/qbo/` (W4-03): create that module as a placeholder whose methods return `api.not_implemented` (any test of the placeholder goes in `crates/migrate/tests/qbo_placeholder.rs`, which W4-03 owns and replaces).
+- Wave 3, batch A (with W3-03 and W3-05). Paths do not overlap; the QBO connector comes later in `crates/migrate/src/qbo/` (W4-03): create that module as a placeholder whose functions return `api.not_implemented`, each taking `&Ctx`, the crate's `Stores`, `Infra` and `Services` (from `migrate::build`) and the operation's command or the job, so W4-03 never needs to change their signatures (any test of the placeholder goes in `crates/migrate/tests/qbo_placeholder.rs`, which W4-03 owns and replaces).
 - Agent: `import-migration-engineer`. A `security-reviewer` pass is required in Weave 3.
 - Timebox: three sessions, then `/handoff`.
 

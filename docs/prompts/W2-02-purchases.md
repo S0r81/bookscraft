@@ -63,6 +63,7 @@ Out: purchase orders (later), bill pay or any money movement (I-11), UI (W3-02).
 | Invariant | Test |
 |---|---|
 | I-3 | voids are reversals; the EXP-01 edit writes original, reversal and revision 2 |
+| I-5 | T-PURCH-1: a zero-amount bill payment cannot be posted or voided in a hard-locked period, and needs the `period.override` permission and a reason in a soft-locked one |
 | I-6 | T-AUDIT-1 on every mutating command |
 | I-10 | agent drafts only; agent post refused |
 | I-11 | no payment-sending feature exists (reviewed; T-SCOPE-1 covers the routes) |
@@ -75,11 +76,12 @@ Out: purchase orders (later), bill pay or any money movement (I-11), UI (W3-02).
 | AC-2 | The EXP-01 typo fix (spine S13) leaves three entries: original 186.40, its reversal, revision 2 at 168.40 | service test |
 | AC-3 | Settlement rules | tests: over-application refused with `purchases.application_exceeds_open`; another vendor's bill refused with `purchases.application_mismatch`; a zero-amount payment applying a vendor credit writes no journal entry |
 | AC-4 | An expense line to AP without a contact is refused | test |
-| AC-5 | Agent rule | tests: an agent creates a draft expense (as in S28); its post fails with `auth.agent_forbidden`; creating a bill payment fails with `auth.agent_forbidden`; the owner approves the draft |
-| AC-6 | T-AUDIT-1 | `assert_audited` in each mutating command's test |
-| AC-7 | Routes behave per API.md | contract tests per endpoint |
-| AC-8 | No spine regression | `cargo xtask spine` reports 0 failed |
-| AC-9 | Lints pass and only owned paths changed | `cargo xtask lint` and `cargo xtask scope W2-02` exit 0 |
+| AC-5 | T-PURCH-1: locks cover zero-amount payments | tests: a zero-amount bill payment applying a vendor credit, dated on or before the hard-lock date, fails with `period.hard_locked` (post and void); dated in a soft-locked period, it fails with `period.soft_locked` for a bookkeeper and succeeds for an accountant with a reason, appending `period.override` |
+| AC-6 | Agent rule | tests: an agent creates a draft expense (as in S28); its post fails with `auth.agent_forbidden`; creating a bill payment fails with `auth.agent_forbidden`; the owner approves the draft |
+| AC-7 | T-AUDIT-1 | `assert_audited` in each mutating command's test |
+| AC-8 | Routes behave per API.md | contract tests per endpoint |
+| AC-9 | No spine regression | `cargo xtask spine` reports 0 failed |
+| AC-10 | Lints pass and only owned paths changed | `cargo xtask lint` and `cargo xtask scope W2-02` exit 0 |
 
 ## Verify
 
