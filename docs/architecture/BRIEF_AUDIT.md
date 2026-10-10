@@ -1,6 +1,8 @@
 # Brief audit
 
-Audits [`docs/research/bookscraft-brief.md`](../research/bookscraft-brief.md) (sha256 `440d638f…a477`, 468 lines, read in full on 2026-10-09) against the owner's decisions and locked invariants. Every finding carries a recommended answer and names the ADR or spec document it lands in. Every recommendation is **proposed** until the owner approves it at the Step 1 checkpoint.
+Audits [`docs/research/bookscraft-brief.md`](../research/bookscraft-brief.md) (sha256 `440d638f…a477`, 468 lines, read in full on 2026-10-09) against the owner's decisions and locked invariants. Every finding carries a recommended answer and names the ADR or spec document it lands in.
+
+**Checkpoint result (2026-10-10).** The owner answered "defaults (also im on fedora)": every default in §10 is accepted, and Q-1 is confirmed (Fedora, GNOME on Wayland, NVIDIA RTX 3060). Q-9 stays open by its own default (playbook §1.4). The recommendations below are therefore decisions; where an accepted ADR later refined one, §9.1 records the change. The Step 2 self-check (every MVP feature traced to tables, posting, API and prompts; every invariant traced to a test) is in [ROADMAP](../roadmap/ROADMAP.md) §7–§8. The Step 4 independent review is logged in §11.
 
 ## 0. Authority and IDs
 
@@ -289,19 +291,41 @@ Dependency rules (each one is checked by `cargo xtask lint` from Wave 0):
 | 0029 | Scenario spine | QA-owned month of agency bookkeeping with golden reports; each step declares the capabilities it needs and runs once a crate declares them, so builders never edit spine files | One end-to-end test edited by every work package | Low |
 | 0030 | Where "100% Rust" stops | No JavaScript or Node authored or required. CSS, the WASM host HTML page, Typst templates, the Flatpak manifest and container files are data or config, processed by `xtask` | Inline styles only; Rust-generated templates | Low to medium |
 
+### 9.1 Changes since the register
+
+The register above is what the checkpoint approved. Writing the specs refined these items; the ADRs and specs are authoritative.
+
+| Item | Register or audit said | Accepted decision | Why |
+|---|---|---|---|
+| ADR-0015 | Cash basis from `document_link` applications | From the `settlement` table, the append-only AR/AP application graph (`document_link` keeps only estimate-to-invoice and similar links) | Applications need their own amounts, dates and voids; cash-basis allocation reads them directly (LEDGER_SPEC §5, §7) |
+| ADR-0019 | rusqlite + refinery | An own forward-only migration runner in `store` (embedded SQL, `schema_migrations`) | refinery and rusqlite_migration both couple to a rusqlite version; the runner also keeps backup-before-migrate in one place |
+| ADR-0019, OV-12 | End-to-end tests over chromedriver; desktop smoke tests by hand | `fantoccini` with WebKitWebDriver against the web build (the Linux desktop's engine) and `tauri-driver` for the desktop app, both started by `cargo xtask e2e`; installed by the environment setup script | Same engine as the shipped desktop; the tests never start processes (D-5) |
+| ADR-0019 | — | Added pins: `toml` 0.9.8, `tauri-cli` 2.12.0, `tauri-driver` 2.1.0 | Needed by `xtask`, packaging and desktop end-to-end tests |
+| §7.5 | "Leptos 0.8 built with Trunk inside Tauri 2.12" | No Trunk: `cargo xtask ui build` runs `wasm-bindgen` through `wasm-bindgen-cli-support` (ARCHITECTURE §10) | One Rust tool chain, no downloads at UI build time |
+| ADR-0024 | In-process tokio scheduler | One runner thread per process claiming jobs from the system file; each kind dispatched to its owning port's `run_job` (ARCHITECTURE §12) | Services are synchronous; a thread is simpler than a scheduler and identical in every shell |
+| ADR-0025 | Invoice, statement and report templates (crate map) | PDFs and previews for sales documents only; report screens print through the webview dialog; no report or statement PDF endpoint in MVP | The brief's MVP asks for invoice PDF and email; printing covers reports |
+| ADR-0026 | Packages without an identifier | Application identifier `io.github.s0r81.bookscraft` (Flathub rule for GitHub-hosted apps); a CLI and server tarball beside the desktop packages; draft releases on `v*` tags | The identifier is expensive to change after the first release; server mode needs a binary |
+| ADR-0028 | Required: fmt, clippy, 3-OS tests, cargo-deny, spine | Also `lint`, `scope` and `dco` (ten required checks) | Ownership and sign-off are enforced by CI, not by convention |
+| ADR-0029 | Steps run once a crate declares their capabilities | 31 steps run in order; the first step with missing capabilities, and every later step, report pending | A later step depends on earlier steps' data |
+| ADR-0030 | CSS, host page, Typst, Flatpak, container files | Also the desktop entry and AppStream metainfo, and `.claude/hooks/session-start.sh` as the one allowed shell script (installing Rust) | D-1 exempts the minimal shell needed to install Rust |
+| G-19 | Accountant = bookkeeper rights without user admin | Accountant = bookkeeper rights plus period locks and overrides, audit log, imports, exports and backups; no settings, members, users or bank feeds (API.md §6) | Matches what an outside accountant does at close |
+| Wave 0 order | Contracts, store and ledger in parallel | W0-01, then W0-02 (with W0-06 beside it), then W0-05, W0-04, W0-03; `domain` depends only on `money` | `store` reuses `ledger`'s error codes and `BalancedEntry`; ordering removes a circular wait |
+| Infrastructure wiring | — | Fixed infrastructure constructors in each crate and `app::infra` (ARCHITECTURE §4.5); `render` depends on `store` | Shells can build a production `Infra` without later edits to `app` |
+| MCP stdio | stdio locally or against a server | stdio on a local company file only; remote agents use `/mcp` | A stdio-to-server bridge adds a client stack for no MVP need |
+
 ## 10. Questions for the owner (checkpoint)
 
-| ID | Question | Default if unanswered |
-|---|---|---|
-| Q-1 | Which Linux distro and desktop will the UI spike be checked on? NVIDIA + Wayland matters for the webview | Fedora with GNOME on Wayland |
-| Q-2 | GitHub plan, repo name and visibility. No repo exists yet and this session can't create one | Public `S0r81/bookscraft`, created empty, with the Claude GitHub App installed |
-| Q-3 | Claude plan, whether Projects (beta) shows at claude.ai/code, and how many sessions to run at once | 3 concurrent work packages |
-| Q-4 | Under "100% Rust", are hand-written CSS, one HTML host page and Typst templates acceptable as data files? | Yes; no JavaScript and no Node anywhere |
-| Q-5 | ArtCraft avoids web views. Is an OS webview (not Electron) acceptable for BooksCraft? | Yes; README makes no "no web views" claim |
-| Q-6 | AGPL-3.0-only or AGPL-3.0-or-later? | AGPL-3.0-only |
-| Q-7 | Scope moves: manual sales tax into MVP; server mode with local accounts in MVP and OIDC in v1; PWA and OCR to v1 | Accept all three |
-| Q-8 | Is the MVP pilot company your own agency's QBO file? That decides whether your own Intuit app is enough for MVP | Yes, so no relay before v1 |
-| Q-9 | Which name and email should agent-written commits use in `Signed-off-by`? | Ask again before the first Wave 0 commit |
+| ID | Question | Default if unanswered | Answer (2026-10-10) |
+|---|---|---|---|
+| Q-1 | Which Linux distro and desktop will the UI spike be checked on? NVIDIA + Wayland matters for the webview | Fedora with GNOME on Wayland | Fedora (owner), GNOME on Wayland, NVIDIA RTX 3060 |
+| Q-2 | GitHub plan, repo name and visibility. No repo exists yet and this session can't create one | Public `S0r81/bookscraft`, created empty, with the Claude GitHub App installed | Default |
+| Q-3 | Claude plan, whether Projects (beta) shows at claude.ai/code, and how many sessions to run at once | 3 concurrent work packages | Default |
+| Q-4 | Under "100% Rust", are hand-written CSS, one HTML host page and Typst templates acceptable as data files? | Yes; no JavaScript and no Node anywhere | Default |
+| Q-5 | ArtCraft avoids web views. Is an OS webview (not Electron) acceptable for BooksCraft? | Yes; README makes no "no web views" claim | Default |
+| Q-6 | AGPL-3.0-only or AGPL-3.0-or-later? | AGPL-3.0-only | Default |
+| Q-7 | Scope moves: manual sales tax into MVP; server mode with local accounts in MVP and OIDC in v1; PWA and OCR to v1 | Accept all three | Default |
+| Q-8 | Is the MVP pilot company your own agency's QBO file? That decides whether your own Intuit app is enough for MVP | Yes, so no relay before v1 | Default |
+| Q-9 | Which name and email should agent-written commits use in `Signed-off-by`? | Ask again before the first Wave 0 commit | Open: the owner fills in CLAUDE.md §8 before W0-01 (playbook §1.1 step 4); the W0-01 precondition and CI job `dco` refuse the placeholder |
 
 ## 11. Independent review log (Step 4)
 
