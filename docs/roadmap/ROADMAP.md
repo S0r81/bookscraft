@@ -32,7 +32,7 @@ Cash-basis parity with QuickBooks is measured and reported, not part of the exit
 | Wave | Work packages | Theme |
 |---|---|---|
 | 0 | W0-01 workspace, xtask, CI · W0-02 contracts · W0-05 ledger core and posting framework · W0-04 storage · W0-03 test harness and spine · W0-06 UI spike | Foundations, in that order (W0-06 alongside) |
-| 1 | W1-01 posting rules · W1-02 books service · W1-03 identity · W1-04 interchange, OFX and IIF libraries · W1-05 API framework, composition root, company, identity and books routes | Core services and the API |
+| 1 | W1-01 posting rules · W1-02 books service · W1-03 identity · W1-04 interchange and OFX libraries · W1-05 API framework, composition root, company, identity and books routes | Core services and the API |
 | 2 | W2-01 sales · W2-02 purchases · W2-03 banking · W2-04 reports · W2-05 UI foundation | Daily bookkeeping end to end (the spine passes) |
 | 3 | W3-01 UI sales · W3-02 UI purchases and banking · W3-03 QBO mapper · W3-04 migration pipeline · W3-05 platform and desktop shell | Screens, migration, desktop |
 | 4 | W4-01 UI reports, close, audit, migration wizard · W4-02 server and CLI · W4-03 QBO connector · W4-04 PDF, preview, email · W4-05 SimpleFIN feeds | Completing the MVP surface |
@@ -99,11 +99,12 @@ Every item has a default approach and an owner role. Prompts are written in the 
 | Sales tax filing and payment records | Records against agency liability accounts; reports by period | ledger-engineer |
 | 1099 tracking and PDF forms | Vendor flag and account-to-box mapping as data; thresholds as versioned data (CV-8) | ledger-engineer |
 | Multi-currency | FX rates, realized and unrealized gain or loss (LEDGER_SPEC §8.2); reversible enabling | ledger-engineer |
-| IIF import path and writer; QuickBooks Desktop report-based migration | Uses the MVP `iif` library; validation by monthly trial balance | import-migration-engineer |
+| IIF reader, writer and import path; QuickBooks Desktop report-based migration | Implement the `iif` crate (a stub until then) per MIGRATION_SPEC §8; validation by monthly trial balance | import-migration-engineer |
 | Accountant workspace | Multi-client switcher, review tools, closing checklist, record-level scopes | api-engineer, ui-engineer |
 | OIDC sign-in and custom roles | `identity` extension; permission matrix stays in `domain` | api-engineer |
 | AI-suggested categorization | Rules plus a model of the user's choice through MCP, drafts only (I-10) | api-engineer |
 | Hosted QBO OAuth relay | Only after the owner or a lawyer reviews Intuit's developer terms (ADR-0017) | import-migration-engineer |
+| QBO cut-over import (G-16 option) | Opening trial balance at the cut-over date from QBO's TrialBalance report, open invoices and bills as opening documents (LEDGER_SPEC §4.17), then later transactions | import-migration-engineer |
 | Installable PWA, receipt capture, OCR to draft expense | Same UI bundle; bring-your-own OCR or model | ui-engineer |
 | Desktop "connect to server" and a local socket for CLI and MCP while the desktop runs | ADR-0004 follow-up | platform-release-engineer |
 | Encryption at rest | Evaluate SQLCipher; changes the file format, so it needs an owner decision first (G-14) | storage-engineer |
@@ -143,7 +144,7 @@ Every MVP feature (brief §3 rows marked MVP, §9 Phase 1, and the scope moves t
 | 23 | Generic dimensions: schema, posting, import, report filters | `dimension`, `dimension_value`, `document_dimension`, `document_line_dimension`, `posting_dimension` | §3 rule 7 | `/dimensions`, report `dim[...]` filters | W0-05, W1-01, W1-02, W2-04 |
 | 24 | Custom field values (unlimited) | `custom_field_def`, `custom_field_value` | — | `/custom-fields` | W1-02 |
 | 25 | SimpleFIN live feeds (late MVP) | `bank_feed`, system `secret` | §11 | `/bank-feeds/*` | W4-05, W3-02 |
-| 26 | Opening balances and cut-over | `document` (`opening_balance`) | §4.17 | `/opening-balances` | W0-05, W1-02, W3-04 |
+| 26 | Opening balances (manual setup and the CSV opening trial balance) | `document` (`opening_balance`) | §4.17 | `/opening-balances` | W0-05, W1-02, W3-04 |
 | 27 | Agent drafts and audited human approval (MCP as stretch) | `document` (`created_by_actor_type`, `approved_by_user_id`) | §6 (Approve) | `/approvals`, `documents/{id}/approve`, MCP tools (§8) | W1-02, W1-05, W5-02 |
 | 28 | Backup and verify | `audit_event`, `journal_entry` (content hash) | §10 | `/backups`, `/verify`, `bookscraft verify` | W0-04, W1-02, W4-02 |
 | 29 | Linux desktop app | — | — | custom protocol (ARCHITECTURE §5) | W0-06, W3-05, W5-01 |
@@ -162,7 +163,7 @@ Every locked invariant has at least one planned test, written by a named work pa
 | I-2 Pure, versioned posting | T-POST-1 (determinism); T-POST-2 (pure-crate lint); T-POST-3 (golden per type and version) | W0-05, W1-01; W0-01; W1-01 |
 | I-3 Append-only, balanced | T-LEDGER-1, T-LEDGER-2; T-STORE-1..4, T-STORE-6..10, T-STORE-20; T-PROP-1; T-SALES-1 | W0-05; W0-04; W0-03 (active from Wave 2); W2-01 |
 | I-4 Cash basis derived | T-REP-1; T-SPINE-CASH | W2-04; W0-03 |
-| I-5 Period locks | T-STORE-12; T-BOOKS-1; spine S30 | W0-04; W1-02; W0-03 |
+| I-5 Period locks | T-STORE-12; T-BOOKS-1; T-SALES-3, T-PURCH-1 (zero-amount payments); spine S30 | W0-04; W1-02; W2-01, W2-02; W0-03 |
 | I-6 Audit chain | T-STORE-13 (triggers), T-STORE-19 (verify); T-AUDIT-1 | W0-04; W0-03 (used by every service work package) |
 | I-7 External ids, idempotent imports | T-MIG-1; T-BANK-1; T-STORE-15 | W3-04 and W4-03; W2-03; W0-04 |
 | I-8 Generic dimensions | T-BOOKS-2; T-POST-4 | W1-02; W1-01 |
@@ -185,5 +186,7 @@ Result of the check: every invariant has at least one planned test and an owning
 | Server mode with local accounts in the MVP; OIDC and the accountant workspace in v1 | Owner default Q-7 (C-10) | ADR-0023 |
 | PWA, receipt capture and OCR move to v1; attachments stay in the MVP | Owner default Q-7 (C-2) | this roadmap |
 | Dimensions: schema, posting, import and report filters in the MVP; management UI in v1 | C-5 | ADR-0014 |
-| IIF: library in the MVP; import path in v1 | Brief §3 | MIGRATION_SPEC §1 |
+| IIF reader, writer and import path in v1 (the crate exists as a stub) | Brief §3 and §7.3 put IIF in v1 | MIGRATION_SPEC §1, §8 |
 | MCP server: late-MVP stretch (the agent rule ships in the MVP regardless) | Brief puts MCP in v1; I-10 enforcement must exist in the MVP | ADR-0022 |
+| Custom fields: definitions and values in the MVP; management UI in v1 | Brief §3 puts custom fields in v1; lossless QBO import needs the values | BRIEF_AUDIT §9.1, MIGRATION_SPEC §4.3 |
+| QBO cut-over import in v1; the MVP imports full history | G-16's default is full history | BRIEF_AUDIT §9.1, MIGRATION_SPEC §1 |

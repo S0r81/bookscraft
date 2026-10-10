@@ -312,6 +312,13 @@ The register above is what the checkpoint approved. Writing the specs refined th
 | Wave 0 order | Contracts, store and ledger in parallel | W0-01, then W0-02 (with W0-06 beside it), then W0-05, W0-04, W0-03; `domain` depends only on `money` | `store` reuses `ledger`'s error codes and `BalancedEntry`; ordering removes a circular wait |
 | Infrastructure wiring | — | Fixed infrastructure constructors in each crate and `app::infra` (ARCHITECTURE §4.5); `render` depends on `store` | Shells can build a production `Infra` without later edits to `app` |
 | MCP stdio | stdio locally or against a server | stdio on a local company file only; remote agents use `/mcp` | A stdio-to-server bridge adds a client stack for no MVP need |
+| MCP placement | Brief §9 puts the MCP server in Phase 2 | A late-MVP stretch (W5-02) that may slip to v1; the agent rule (I-10) ships in the MVP either way (ADR-0022, ROADMAP §9) | Agents are part of the positioning; the enforcement already exists in the services |
+| Custom fields | Brief §3: custom fields in v1 | Definitions and values (schema, service, API, import) in the MVP; the management UI in v1 | Lossless QBO import keeps transaction custom fields (MIGRATION_SPEC §4.3); the same pattern as dimensions (C-5) |
+| IIF | Register and MIGRATION_SPEC: parser and writer in the MVP, import path in v1 | Parser, writer and import path all in v1; the `iif` crate stays a stub until then | Brief §3 and §7.3 put IIF in v1, and nothing in the MVP uses it |
+| G-16 cut-over | Default full history; option: cut-over import | Full history is the MVP; the QBO cut-over import is v1 (ROADMAP §6.1) | The MVP exit only needs full history; cut-over needs extra report-based opening balances |
+| G-6 clearing | Changing a cleared line's account, amount or date needs an explicit, audited un-clear | A cleared but unreconciled line that a repost changes is un-cleared automatically, with reason `document edited` and a clearing event; only reconciled lines need the explicit, audited unreconcile (LEDGER_SPEC §11) | Cleared-but-unreconciled state is a working state; the frozen record is the completed reconciliation |
+| Email settings | Per company (API draft) | Installation settings (`/api/v1/settings/email`, `installation.manage`) stored in the system file | One company's admin must not redirect another company's mail on a shared server |
+| Customer statements | `contacts.statement` endpoint | Removed from the MVP; open items per contact remain (`contacts.open_items`) | Not in the brief's MVP, and no work package delivered it |
 
 ## 10. Questions for the owner (checkpoint)
 
