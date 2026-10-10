@@ -1,0 +1,187 @@
+# CODEOWNERS mirrors docs/coordination/OWNERSHIP.md (checked by `cargo xtask lint`).
+# GitHub needs a user or team on every rule, and BooksCraft has one maintainer, so every rule
+# names @S0r81. The comment above each block names the work package and agent role allowed to
+# change those paths; a path can belong to different WPs in different waves.
+# Do not edit by hand: regenerate from OWNERSHIP.md in a Weave.
+
+*  @S0r81
+
+# W0-01 platform-release-engineer
+/Cargo.toml  @S0r81
+/Cargo.lock  @S0r81
+/rust-toolchain.toml  @S0r81
+/.cargo/**  @S0r81
+/rustfmt.toml  @S0r81
+/clippy.toml  @S0r81
+/deny.toml  @S0r81
+/deny-mit.toml  @S0r81
+/.gitattributes  @S0r81
+/.gitignore  @S0r81
+/.github/workflows/**  @S0r81
+/xtask/**  @S0r81
+/crates/**  @S0r81
+/tests/scenarios/Cargo.toml  @S0r81
+/tests/scenarios/src/lib.rs  @S0r81
+/tests/e2e/**  @S0r81
+
+# W0-02 lead-architect
+/crates/money/**  @S0r81
+/crates/domain/**  @S0r81
+/crates/api-types/**  @S0r81
+/Cargo.lock  @S0r81
+
+# W0-03 qa-verifier
+/crates/test-support/**  @S0r81
+/tests/scenarios/**  @S0r81
+/Cargo.lock  @S0r81
+
+# W0-04 storage-engineer
+/crates/store/**  @S0r81
+/Cargo.lock  @S0r81
+
+# W0-05 ledger-engineer
+/crates/ledger/**  @S0r81
+/crates/posting/**  @S0r81
+/Cargo.lock  @S0r81
+
+# W0-06 ui-engineer
+/spikes/ui/**  @S0r81
+/docs/adr/0002-ui-framework.md  @S0r81
+
+# W1-01 ledger-engineer
+/crates/posting/src/rules/**  @S0r81
+/crates/posting/tests/**  @S0r81
+/crates/posting/golden/**  @S0r81
+
+# W1-02 ledger-engineer
+/crates/books/src/**  @S0r81
+/crates/books/tests/**  @S0r81
+/crates/books/templates/**  @S0r81
+
+# W1-03 api-engineer
+/crates/identity/src/**  @S0r81
+/crates/identity/tests/**  @S0r81
+
+# W1-04 import-migration-engineer
+/crates/interchange/src/**  @S0r81
+/crates/interchange/tests/**  @S0r81
+/crates/ofx/src/**  @S0r81
+/crates/ofx/tests/**  @S0r81
+/crates/iif/src/**  @S0r81
+/crates/iif/tests/**  @S0r81
+/docs/architecture/interchange-v1.md  @S0r81
+
+# W1-05 api-engineer
+/crates/api/src/**  @S0r81
+/crates/api/tests/**  @S0r81
+/crates/app/src/**  @S0r81
+/crates/app/tests/**  @S0r81
+/docs/architecture/openapi.json  @S0r81
+
+# W2-01 ledger-engineer
+/crates/sales/src/**  @S0r81
+/crates/sales/tests/**  @S0r81
+/crates/api/src/routes/sales.rs  @S0r81
+
+# W2-02 ledger-engineer
+/crates/purchases/src/**  @S0r81
+/crates/purchases/tests/**  @S0r81
+/crates/api/src/routes/purchases.rs  @S0r81
+
+# W2-03 bank-feeds-engineer
+/crates/banking/src/**  @S0r81
+/crates/banking/tests/**  @S0r81
+/crates/api/src/routes/banking.rs  @S0r81
+
+# W2-04 ledger-engineer
+/crates/reports/src/**  @S0r81
+/crates/reports/tests/**  @S0r81
+/crates/api/src/routes/reports.rs  @S0r81
+
+# W2-05 ui-engineer
+/crates/ui/src/**  @S0r81
+/crates/ui/tests/**  @S0r81
+/crates/ui/index.html  @S0r81
+/crates/ui/style/**  @S0r81
+/crates/ui/assets/**  @S0r81
+/xtask/src/ui.rs  @S0r81
+
+# W3-01 ui-engineer
+/crates/ui/src/pages/sales/**  @S0r81
+
+# W3-02 ui-engineer
+/crates/ui/src/pages/purchases/**  @S0r81
+/crates/ui/src/pages/banking/**  @S0r81
+
+# W3-03 import-migration-engineer
+/crates/qbo/src/**  @S0r81
+/crates/qbo/tests/**  @S0r81
+/crates/qbo/fixtures/**  @S0r81
+
+# W3-04 import-migration-engineer
+/crates/migrate/src/**  @S0r81
+/crates/migrate/tests/**  @S0r81
+/crates/migrate/fixtures/**  @S0r81
+/crates/api/src/routes/imports.rs  @S0r81
+
+# W3-05 platform-release-engineer
+/crates/platform/src/**  @S0r81
+/crates/platform/tests/**  @S0r81
+/crates/desktop/src/**  @S0r81
+/crates/desktop/tests/**  @S0r81
+/crates/desktop/build.rs  @S0r81
+/crates/desktop/tauri.conf.json  @S0r81
+/crates/desktop/capabilities/**  @S0r81
+/crates/desktop/icons/**  @S0r81
+
+# W4-01 ui-engineer
+/crates/ui/src/pages/reports/**  @S0r81
+/crates/ui/src/pages/close/**  @S0r81
+/crates/ui/src/pages/audit/**  @S0r81
+/crates/ui/src/pages/migrate/**  @S0r81
+
+# W4-02 api-engineer
+/crates/cli/src/**  @S0r81
+/crates/cli/tests/**  @S0r81
+
+# W4-03 import-migration-engineer
+/crates/migrate/src/qbo/**  @S0r81
+/crates/migrate/tests/qbo_*.rs  @S0r81
+/crates/migrate/fixtures/qbo_http/**  @S0r81
+
+# W4-04 api-engineer
+/crates/render/src/**  @S0r81
+/crates/render/tests/**  @S0r81
+/crates/render/templates/**  @S0r81
+/crates/render/fonts/**  @S0r81
+/crates/api/src/routes/render.rs  @S0r81
+
+# W4-05 bank-feeds-engineer
+/crates/banking/src/feeds/**  @S0r81
+/crates/banking/tests/feeds_*.rs  @S0r81
+/crates/banking/fixtures/simplefin/**  @S0r81
+/crates/api/src/routes/feeds.rs  @S0r81
+
+# W5-01 platform-release-engineer
+/packaging/**  @S0r81
+/.github/workflows/release.yml  @S0r81
+/xtask/src/package.rs  @S0r81
+/crates/desktop/tauri.conf.json  @S0r81
+/crates/desktop/icons/**  @S0r81
+
+# W5-02 api-engineer
+/crates/mcp/src/**  @S0r81
+/crates/mcp/tests/**  @S0r81
+
+# W5-03 ui-engineer
+/crates/ui/src/components/**  @S0r81
+/crates/ui/src/shell/**  @S0r81
+/crates/ui/src/pages/**  @S0r81
+/crates/ui/tests/**  @S0r81
+/crates/ui/style/**  @S0r81
+
+# W5-04 qa-verifier
+/tests/e2e/src/**  @S0r81
+/tests/e2e/tests/**  @S0r81
+/docs/process/PILOT_RUNBOOK.md  @S0r81
+/docs/process/RELEASE_CHECKLIST.md  @S0r81

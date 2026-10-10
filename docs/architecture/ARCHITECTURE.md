@@ -20,7 +20,7 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 
 ## 2. Crate map
 
-28 workspace members, plus the UI spike in its own workspace. Package names are `bookscraft-<dir>`; the CLI binary is `bookscraft`, the desktop binary `bookscraft-desktop`. "Pure" means no filesystem, network, database, clock, environment or async runtime.
+29 workspace members, plus the UI spike in its own workspace. Package names are `bookscraft-<dir>`; the CLI binary is `bookscraft`, the desktop binary `bookscraft-desktop`. "Pure" means no filesystem, network, database, clock, environment or async runtime.
 
 | Path | License | Pure | Responsibility | Direct workspace deps | First WP |
 |---|---|---|---|---|---|
@@ -51,6 +51,7 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 | `crates/cli` | AGPL | no | `bookscraft` binary: `serve`, `mcp`, `company`, `import`, `export`, `verify`, `backup`, `user`, `token`, `report` | app, api, mcp, platform | W4-02 |
 | `crates/test-support` | AGPL | n/a | Builders, fixtures, golden helpers, proptest strategies, audit assertions (dev-only) | domain, store, ledger, posting, money | W0-03 |
 | `tests/scenarios` | AGPL | n/a | Scenario spine (package `bookscraft-scenarios`) | test-support, app, domain | W0-03 |
+| `tests/e2e` | AGPL | n/a | End-to-end tests: API over HTTP against `bookscraft serve`; desktop through `tauri-driver` and WebKitWebDriver on Linux CI (package `bookscraft-e2e`) | app, api-types | W0-01 (stub), W5-04 |
 | `xtask` | AGPL | n/a | Build automation (`cargo xtask`); no workspace deps | — | W0-01 |
 | `spikes/ui` | AGPL | n/a | UI spike, its own Cargo workspace, excluded from the root workspace (not a member) | — | W0-06 |
 
