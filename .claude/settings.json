@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(cargo build *)",
+      "Bash(cargo check *)",
+      "Bash(cargo test *)",
+      "Bash(cargo clippy *)",
+      "Bash(cargo fmt *)",
+      "Bash(cargo run *)",
+      "Bash(cargo doc *)",
+      "Bash(cargo tree *)",
+      "Bash(cargo metadata *)",
+      "Bash(cargo fetch *)",
+      "Bash(cargo xtask *)",
+      "Bash(cargo deny *)",
+      "Bash(rustup show *)",
+      "Bash(rustup toolchain list *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git switch *)",
+      "Bash(git checkout -b *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git fetch *)",
+      "Bash(git pull --ff-only *)",
+      "Bash(git merge origin/main *)",
+      "Bash(git merge --no-edit origin/main *)",
+      "Bash(git push -u origin wp/*)",
+      "Bash(git push origin wp/*)",
+      "Bash(git push -u origin weave/*)",
+      "Bash(git push origin weave/*)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files *)",
+      "Bash(git worktree list *)",
+      "Bash(gh api repos/S0r81/bookscraft/*)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh run list *)",
+      "Bash(gh run view *)"
+    ],
+    "ask": [
+      "Bash(gh pr merge *)",
+      "Bash(gh api *merge*)",
+      "Bash(gh api *update-branch*)",
+      "Bash(gh api *-X PUT*)",
+      "Bash(gh api *--method PUT*)",
+      "Bash(gh api *-X PATCH*)",
+      "Bash(gh api *--method PATCH*)",
+      "Bash(gh api *releases*)",
+      "Bash(git push origin main*)",
+      "Bash(git branch -d *)",
+      "Bash(git branch -D *)",
+      "Bash(git branch *--delete*)",
+      "Bash(git stash drop*)",
+      "Bash(git stash clear*)",
+      "Bash(git checkout -- *)",
+      "Bash(git restore *)",
+      "Bash(git clean *)",
+      "Bash(git rm *)",
+      "Bash(rm *)"
+    ],
+    "deny": [
+      "Bash(git push *--force*)",
+      "Bash(git push *-f *)",
+      "Bash(git push *-f)",
+      "Bash(git push *+*)",
+      "Bash(git push *--mirror*)",
+      "Bash(git push *--prune*)",
+      "Bash(git push *--delete*)",
+      "Bash(git push *-d *)",
+      "Bash(git push origin :*)",
+      "Bash(git reset --hard*)",
+      "Bash(git rebase *)",
+      "Bash(git commit *--amend*)",
+      "Bash(git filter-branch *)",
+      "Bash(git filter-repo *)",
+      "Bash(gh api *git/refs*)",
+      "Bash(gh api *-X DELETE*)",
+      "Bash(gh api *--method DELETE*)",
+      "Bash(gh repo delete *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(pnpm *)",
+      "Bash(yarn *)",
+      "Bash(bun *)",
+      "Edit(/docs/research/bookscraft-brief.md)"
+    ]
+  },
+  "env": {
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "1"
+  },
+  "worktree": {
+    "baseRef": "head"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && { [ ! -f xtask/Cargo.toml ] || cargo xtask hook guard; }",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && { [ ! -f xtask/Cargo.toml ] || cargo xtask hook fmt; }",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && { [ ! -f xtask/Cargo.toml ] || cargo xtask hook stop; }",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}
