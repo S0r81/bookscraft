@@ -6,13 +6,13 @@ States: `planned` → `ready` (dependencies merged) → `in_progress` (session s
 
 | WP | Wave | Title | Agent | Branch | PR | State | Notes |
 |---|---|---|---|---|---|---|---|
-| W0-01 | 0 | Workspace bootstrap, toolchain, xtask, CI matrix | platform-release-engineer | wp/W0-01-workspace | — | ready | Needs the repo, the cloud environment and the sign-off identity (playbook §1–§2) |
-| W0-02 | 0 | Contracts: money, domain, api-types | lead-architect | wp/W0-02-contracts | — | planned | after W0-01 |
-| W0-03 | 0 | Test harness and scenario spine | qa-verifier | wp/W0-03-spine | — | planned | after W0-02 |
-| W0-04 | 0 | Storage engine and migration framework | storage-engineer | wp/W0-04-store | — | planned | after W0-03 |
-| W0-05 | 0 | Ledger core and posting framework | ledger-engineer | wp/W0-05-ledger | — | planned | after W0-04 |
-| W0-06 | 0 | UI framework spike (timeboxed) | ui-engineer | wp/W0-06-ui-spike | — | planned | after W0-01; owner verifies on Fedora |
-| W0-W | 0 | Weave 0 | lead-architect | weave/W0 | — | planned | after W0-01..06 |
+| W0-01 | 0 | Workspace bootstrap, toolchain, xtask, CI matrix | platform-release-engineer | wp/W0-01-workspace | — | ready | Wave 0 order 1. Needs the merged architecture PR, the cloud environment and the sign-off identity (playbook §1–§2) |
+| W0-02 | 0 | Contracts: money, domain, api-types | lead-architect | wp/W0-02-contracts | — | planned | Wave 0 order 2: after W0-01 is merged |
+| W0-03 | 0 | Test harness and scenario spine | qa-verifier | wp/W0-03-spine | — | planned | Wave 0 order 5: after W0-04 is merged |
+| W0-04 | 0 | Storage engine and migration framework | storage-engineer | wp/W0-04-store | — | planned | Wave 0 order 4: after W0-05 is merged |
+| W0-05 | 0 | Ledger core and posting framework | ledger-engineer | wp/W0-05-ledger | — | planned | Wave 0 order 3: after W0-02 is merged |
+| W0-06 | 0 | UI framework spike (timeboxed) | ui-engineer | wp/W0-06-ui-spike | — | planned | Runs beside W0-02..W0-05 once W0-01 is merged; owner verifies on Fedora |
+| W0-W | 0 | Weave 0 | lead-architect | weave/W0 | — | planned | Merges each Wave 0 PR as it turns green, then closes the wave after W0-01..W0-06 |
 | W1-01 | 1 | Posting rules for every MVP document type | ledger-engineer | wp/W1-01-posting-rules | — | planned | |
 | W1-02 | 1 | Books service | ledger-engineer | wp/W1-02-books | — | planned | |
 | W1-03 | 1 | Identity | api-engineer | wp/W1-03-identity | — | planned | security review in Weave 1 |

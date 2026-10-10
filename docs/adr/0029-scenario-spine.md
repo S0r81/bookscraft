@@ -29,7 +29,8 @@ Chosen option: **capability-gated spine**.
 * W0-03 writes all 31 steps and the golden trial balance, P&L (accrual and cash), balance sheet, agings, sales tax liability and reconciliation.
 * Steps drive real services through `app::compose` (no HTTP).
 * `cargo xtask spine` reports passed, failed and pending steps; CI job `spine` fails on any failed step.
-* A crate registers a capability only when it is complete, so pending steps light up as packages merge.
+* Steps run in order, because each builds on the company state the earlier ones left. The first step whose capabilities are not all registered, and every step after it, report `pending`.
+* A crate registers a capability only when it is complete, so pending steps light up as packages merge: S01–S02 after Wave 1, the rest after Wave 2.
 * Only QA and Weave sessions edit the spine.
 
 ### Consequences

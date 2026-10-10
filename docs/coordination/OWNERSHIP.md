@@ -17,7 +17,7 @@ Every WP also owns two coordination files, which are not repeated in the rows:
 | WP | Wave | Agent | Branch | Owned paths |
 |---|---|---|---|---|
 | W0-01 | 0 | platform-release-engineer | wp/W0-01-workspace | `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/**`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, `deny-mit.toml`, `.gitattributes`, `.gitignore`, `.github/workflows/**`, `xtask/**`, `crates/**`, `tests/scenarios/Cargo.toml`, `tests/scenarios/src/lib.rs`, `tests/e2e/**` |
-| W0-02 | 0 | lead-architect | wp/W0-02-contracts | `crates/money/**`, `crates/domain/**`, `crates/api-types/**`, `Cargo.lock` |
+| W0-02 | 0 | lead-architect | wp/W0-02-contracts | `crates/money/**`, `crates/domain/**`, `crates/api-types/**`, `crates/app/src/**`, `Cargo.lock` |
 | W0-03 | 0 | qa-verifier | wp/W0-03-spine | `crates/test-support/**`, `tests/scenarios/**`, `Cargo.lock` |
 | W0-04 | 0 | storage-engineer | wp/W0-04-store | `crates/store/**`, `Cargo.lock` |
 | W0-05 | 0 | ledger-engineer | wp/W0-05-ledger | `crates/ledger/**`, `crates/posting/**`, `Cargo.lock` |

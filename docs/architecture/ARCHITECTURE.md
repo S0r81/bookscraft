@@ -24,13 +24,13 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 
 | Path | License | Pure | Responsibility | Direct workspace deps | First WP |
 |---|---|---|---|---|---|
-| `crates/money` | MIT | yes | `Minor`, `Money`, `Currency`, decimal `Rate`, rounding modes, `allocate`, checked arithmetic, decimal-string serde | — | W0-02 |
+| `crates/money` | MIT | yes | `Minor`, `Money`, `Currency`, decimal `Rate`, rounding modes, `allocate`, document totals (`calc`: the LEDGER_SPEC §4.1 amounts, shared by the services and the UI), checked arithmetic, decimal-string serde | — | W0-02 |
 | `crates/ledger` | MIT | yes | `BalancedEntry`, posting lines, reversal, trial balance fold, lock evaluation, invariant checks | money | W0-05 |
 | `crates/interchange` | MIT | yes | Open import/export model (the documented export bundle; MIGRATION_SPEC §3) | money | W1-04 |
 | `crates/iif` | MIT | yes | IIF reader and writer; IIF ↔ interchange mapping | interchange, money | W1-04 |
 | `crates/ofx` | MIT | yes | OFX 1.x (SGML) and 2.x (XML), QFX and QBO (Web Connect) statement parser | money | W1-04 |
 | `crates/qbo` | MIT | yes | QBO API entity types (serde) and mapping to interchange | interchange, money | W3-03 |
-| `crates/domain` | AGPL | yes | Contracts: ids, dates, entities, documents, commands, queries, errors, capabilities, principals, permission matrix, ports | money, ledger | W0-02 |
+| `crates/domain` | AGPL | yes | Contracts: ids, dates, entities, documents, commands, queries, errors, capabilities, principals, permission matrix, ports | money | W0-01 (skeleton), W0-02 |
 | `crates/posting` | AGPL | yes | Document → postings rules, versioned per document type | domain, ledger, money | W0-05, W1-01 |
 | `crates/api-types` | AGPL | yes | HTTP request/response DTOs; compiles to `wasm32-unknown-unknown`; OpenAPI derives behind feature `openapi` | money | W0-02 |
 | `crates/store` | AGPL | no | SQLite files, migrations, write path, triggers' error codes, audit chain, file lock, backup, verify, idempotency and job storage | domain, ledger, money | W0-04 |
@@ -44,7 +44,7 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 | `crates/render` | AGPL | no | Typst invoice, statement and report templates → PDF and SVG preview; email via SMTP | domain, money | W4-04 |
 | `crates/api` | AGPL | no | axum router, middleware (auth, idempotency, ETag, errors, limits), OpenAPI document, route modules per area | domain, api-types, money | W1-05 |
 | `crates/mcp` | AGPL | no | MCP server (rmcp): read and draft tools with scopes | domain | W5-02 |
-| `crates/app` | AGPL | no | Composition root: builds every service from a `store::Stores` plus `domain::ports::Infra`; job runner | domain, store, books, sales, purchases, banking, reports, migrate, identity, render, api, mcp | W1-05 |
+| `crates/app` | AGPL | no | Composition root: builds every service from a `store::Stores` plus `domain::ports::Infra`; job runner | domain, store, books, sales, purchases, banking, reports, migrate, identity, render, api, mcp | W0-01 (compose), W1-05 |
 | `crates/ui` | AGPL | n/a | Leptos client-side app compiled to WASM: shell, design system, pages | api-types, money | W2-05 |
 | `crates/platform` | AGPL | no | All OS-specific code: directories, keychain, open URI, webview environment fixes, file permissions | domain | W0-01 (dirs), W3-05 |
 | `crates/desktop` | AGPL | no | Tauri 2 shell: window, custom protocol, embedded router, desktop principal | app, api, platform | W3-05 |
@@ -95,7 +95,7 @@ flowchart TB
   iif --> interchange
   ofx --> money
   qbo --> interchange
-  domain --> ledger
+  domain --> money
   posting --> domain
   apitypes --> money
   store --> domain
@@ -217,14 +217,36 @@ Each service crate declares `pub const CAPABILITIES: &[Capability]` in its `lib.
 
 ### 4.5 Fixed constructors (no composition hotspot)
 
-Every service crate exposes exactly one constructor with a signature fixed in W0-01:
+Every service crate exposes exactly one constructor and one capability list, with signatures fixed in W0-01:
 
 ```rust
-pub fn build(stores: bookscraft_store::Stores, infra: bookscraft_domain::ports::Infra) -> std::sync::Arc<dyn bookscraft_domain::ports::XxxService>;
+// sales, purchases, banking, reports and render implement one port each
+pub fn build(stores: bookscraft_store::Stores, infra: bookscraft_domain::ports::Infra) -> std::sync::Arc<dyn bookscraft_domain::ports::SalesService>;
+// books, identity and migrate implement two ports each and return a bundle:
+//   books    -> bookscraft_domain::ports::BooksPorts    { company: Arc<dyn CompanyService>, books: Arc<dyn BooksService> }
+//   identity -> bookscraft_domain::ports::IdentityPorts { identity: Arc<dyn IdentityService>, authenticator: Arc<dyn Authenticator> }
+//   migrate  -> bookscraft_domain::ports::MigratePorts  { import: Arc<dyn ImportService>, export: Arc<dyn ExportService> }
 pub const CAPABILITIES: &[bookscraft_domain::capability::Capability];
 ```
 
-The W0-01 stub returns an implementation whose methods return `DomainError` code `api.not_implemented` (HTTP 501). `app::compose` calls every `build` from W1-05 on and never needs editing when a crate is implemented.
+`IdempotencyStore` and `JobQueue` come from `store::Stores` directly. Until a crate is implemented, its `build` returns `domain::ports::stubs::Unimplemented`, one type that implements every service port and answers `DomainError` code `api.not_implemented` (HTTP 501). The stub lives in `domain`, so a port change made in `domain` updates the stub in the same crate and never touches a service crate.
+
+W0-01 writes the skeleton: every crate, every `build` and `CAPABILITIES`, the port trait names (empty), `Services`, `Infra`, the three port bundles, `Capability` with all variants, `DomainError`, `stubs::Unimplemented`, `store::Stores`, and `app::compose(stores, infra) -> Services`, which calls every `build`. W0-02 fills the ports with their methods without renaming any skeleton item. `app::compose` never needs editing when a crate is implemented; W1-05 adds the job runner and the HTTP state around it.
+
+### 4.6 Data access and shared write paths
+
+Services own their SQL. `store` opens files and hands out transactions; it does not hold a repository per table, because it is a Weave-only crate after Wave 0 and services must be able to add queries without touching it.
+
+| Concern | Where |
+|---|---|
+| Opening files, locks, pragmas, migrations, backups, verify | `store` |
+| Transactions | `store` write handle (`BEGIN IMMEDIATE`, pre-commit open-entry check) and read handle; `store::sql` re-exports `rusqlite` so every crate uses one version |
+| Posting, reposting and voiding (DATA_MODEL §4.3, including settlements, clearing events and the reconciled-line rule) | `store::ledger::post_revision` and `store::ledger::void_document`, the only code that writes ledger tables |
+| Audit events | `store::audit::append`, called inside the same transaction as the change |
+| Idempotency keys and jobs | `store` (`IdempotencyStore` and `JobQueue` implementations) |
+| Everything else (lists, documents, bank lines, reconciliations, imports) | SQL in the owning service crate, against the normative schema |
+| Generic document actions (`post`, `approve`, `void`, `delete`) | `api` reads the document type and calls the owning service; `books` provides the shared draft, approval and void helpers that `sales`, `purchases` and `banking` call |
+| Error codes | Each code string is defined by exactly one constant, in the crate that owns its namespace; other crates import it. `domain` owns `validation.*`, `api.not_implemented` and the authorization codes `auth.forbidden`, `auth.agent_forbidden` and `auth.scope_missing`; `ledger` owns the codes `BalancedEntry` and `LockState` return, which `store` reuses for the matching triggers |
 
 ## 5. Process topology
 
@@ -515,7 +537,7 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 
 ## 14. Observability
 
-`tracing` with `tracing-subscriber`. Desktop writes to `<log_dir>/bookscraft.log`, rotated at 10 MB with 5 files kept. The server logs to stderr, as JSON when `--log-format json` is set. Every request logs its id, route, status and latency, never bodies or secrets. There is no telemetry; nothing is sent anywhere by default (G-25).
+`tracing` with `tracing-subscriber`. Desktop writes to `<log_dir>/bookscraft.log` through `tracing-appender`, rotated daily with 7 files kept. The server logs to stderr, as JSON when `--log-format json` is set. Every request logs its id, route, status and latency, never bodies or secrets. There is no telemetry; nothing is sent anywhere by default (G-25).
 
 ## 15. Tooling
 

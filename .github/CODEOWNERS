@@ -28,6 +28,7 @@
 /crates/money/**  @S0r81
 /crates/domain/**  @S0r81
 /crates/api-types/**  @S0r81
+/crates/app/src/**  @S0r81
 /Cargo.lock  @S0r81
 
 # W0-03 qa-verifier

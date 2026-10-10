@@ -74,12 +74,13 @@ Every error is RFC 9457 problem details:
 
 | Namespace | Owner crate | Examples |
 |---|---|---|
-| `validation` | api | `validation.required`, `validation.unknown_field`, `validation.money_format`, `validation.date_format`, `validation.out_of_range` |
+| `validation` | domain (codes), api (mapping) | `validation.required`, `validation.unknown_field`, `validation.money_format`, `validation.date_format`, `validation.out_of_range` |
 | `api` | api | `api.not_found`, `api.not_implemented`, `api.payload_too_large`, `api.internal` |
 | `idempotency`, `concurrency` | api | section 2 |
-| `auth` | identity (codes), api (mapping) | `auth.required`, `auth.invalid_credentials`, `auth.forbidden`, `auth.agent_forbidden`, `auth.scope_missing`, `auth.rate_limited` |
+| `auth` | domain (`auth.forbidden`, `auth.agent_forbidden`, `auth.scope_missing`), identity (the rest), api (mapping) | `auth.required`, `auth.invalid_credentials`, `auth.forbidden`, `auth.agent_forbidden`, `auth.scope_missing`, `auth.rate_limited` |
 | `money` | money | `money.overflow`, `money.currency_mismatch` |
 | `ledger`, `document`, `period`, `audit`, `settlement`, `store` | store (trigger codes from schema.sql) and ledger | DATA_MODEL.md §5 |
+| `posting` | posting | `posting.invalid_account`, `posting.invalid_contact`, `posting.source_unbalanced` (an import whose source amounts do not balance within 2 minor units); warning `posting.source_rounding_adjusted`. The import report shows them as `import.unbalanced_source` and `import.rounding_adjusted` (LEDGER_SPEC §8.1) |
 | `books` | books | `books.account_in_use`, `books.system_account_protected`, `books.duplicate_name`, `books.lock_reason_required`, `books.hard_unlock_requires_owner` |
 | `sales`, `purchases` | sales, purchases | `sales.application_exceeds_open`, `sales.application_mismatch`, `sales.applied_amount_exceeds_total`, `sales.payment_before_charge` (warning) |
 | `banking`, `reconciliation` | banking (plus store trigger codes) | `banking.already_deposited`, `banking.match_amount_mismatch`, `reconciliation.difference_not_zero`, `reconciliation.reconciled_line_changed` |

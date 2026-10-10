@@ -215,7 +215,7 @@ This gives one-way refresh for parallel running during cut-over. Two-way sync is
 
 | Test | What | WP |
 |---|---|---|
-| T-MIG-1 | Import the same QBO fixture twice: second run creates nothing and reports all duplicates | W3-04 |
+| T-MIG-1 | Import the same QBO-sourced data twice: the second run creates nothing and reports all duplicates. W3-04 uses an interchange bundle carrying QBO source refs; W4-03 repeats it end to end with the recorded QBO API fixture | W3-04, W4-03 |
 | T-MIG-2 | Synthetic QBO fixtures (hand-written from the public API reference: every entity type in section 4.2, discount, group, tax-inclusive, voided, unapplied, multi-AR) → golden interchange output | W3-03 |
 | T-MIG-3 | Interchange round trip of the spine company | W3-04 |
 | T-MIG-4 | Source rounding ±2 → rounding account; ±3 → failure | W3-04 |
