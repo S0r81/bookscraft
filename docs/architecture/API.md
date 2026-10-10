@@ -86,10 +86,10 @@ Every error is RFC 9457 problem details:
 | `banking`, `reconciliation` | banking (plus store trigger codes) | `banking.already_deposited`, `banking.match_amount_mismatch`, `reconciliation.difference_not_zero`, `reconciliation.reconciled_line_changed` |
 | `reports` | reports | `reports.invalid_period` |
 | `import`, `export` | migrate | `import.duplicate`, `import.unbalanced_source`, `import.multi_currency_unsupported`, `import.qbo_auth_failed`, `import.parity_failed` |
-| `render` | render | `render.template_error`, `render.smtp_failed` |
+| `render` | render | `render.template_error`, `render.smtp_failed`, `render.not_sendable` (only posted documents are emailed) |
 | `mcp` | mcp | `mcp.tool_not_permitted` |
 
-Warnings (non-blocking) come back in a `warnings` array on the success body, using the same `{field, code, message}` shape. `cargo xtask docs` regenerates the full code table from the constants in the Weave.
+Warnings (non-blocking) come back in a `warnings` array on the success body, using the same `{field, code, message}` shape. `cargo xtask docs` regenerates the full code table, `docs/architecture/error-codes.md`, from the constants; only a Weave runs it.
 
 ## 5. HTTP endpoints
 
@@ -298,7 +298,7 @@ Permission: `reports.read` (audit events: `audit.read`). Agents may read reports
 | `books:read` | `company.read`, `books.read` | ✓ | ✓ |
 | `reports:read` | `reports.read` | ✓ | ✓ |
 | `drafts:write` | create, update and delete drafts the token created; attachments on those drafts; `bank.add` as draft | ✓ | ✓ |
-| `books:write` | `books.write`, `documents.post`, `bank.review`, `reconcile` | ✓ | **never** (T-ID-2) |
+| `books:write` | `books.write`, `documents.post`, `documents.send`, `bank.review`, `reconcile` | ✓ | **never** (T-ID-2) |
 
 **Agent rule (I-10).** A principal with `actor_type = agent` is refused (403 `auth.agent_forbidden`) on: post, approve, void, repost, delete of non-own drafts, period locks, reconciliation, bank match, exclude and undo, imports, exports, backups, settings, members, users, tokens, bank feeds and audit events. This holds whatever scopes are granted (T-API-1).
 
@@ -391,11 +391,12 @@ Input-only fields: `post` (boolean, default false) and `lock_override_reason` (s
 
 | Topic | Rule |
 |---|---|
-| SDK | `rmcp` 3.x with features `server`, `macros`, `transport-io`, `transport-streamable-http-server`, `schemars` |
-| Transports | stdio (`bookscraft mcp --company <file>` or `--server <url> --token-file <file>`) and streamable HTTP at `/mcp` in server mode |
-| Authentication | Agent token (bearer on HTTP; `--token-file` or `BOOKSCRAFT_TOKEN` on stdio remote). Locally, the process acts as the desktop principal with `actor_type = agent`, so I-10 holds in every mode. |
+| SDK | `rmcp` 3.4.1 with features `server`, `macros`, `transport-io`, `transport-streamable-http-server`, `schemars` (ADR-0019) |
+| Transports | stdio (`bookscraft mcp --company <file>`, in-process on a local company file; entry point `mcp::serve_stdio`) and streamable HTTP at `/mcp` in server mode (`mcp::http_router`). Remote agents connect to `/mcp` directly; there is no stdio-to-server bridge in MVP. |
+| Authentication | On `/mcp`, an agent token as a bearer (other principals get 403 `auth.forbidden`). On stdio, the process acts as the desktop principal with `actor_type = agent`. I-10 holds in both. |
+| Company | stdio uses the `--company` file. On `/mcp`, a token bound to one company uses it; otherwise every tool takes a `company_id` argument. |
 | Resources and prompts | None in MVP |
-| Output | Tool results are JSON objects with the same shapes as the HTTP DTOs, plus a short text summary |
+| Output | Tool results are the JSON serialization of the `domain` read models (money as decimal strings, as on the wire), plus a short text summary. They are close to the HTTP DTOs but not guaranteed identical, because `mcp` depends only on `domain` (D-8). |
 
 | Tool | Scope | Purpose |
 |---|---|---|
@@ -418,7 +419,7 @@ Never exposed as tools: post, approve, void, repost, delete of others' drafts, p
 bookscraft [--company <file> | --server <url> [--token-file <file>]] [--data-dir <dir>] [--format table|json|csv] [--yes] <command>
 
 serve        --config <file> --bind <addr:port> [--tls-cert <pem> --tls-key <pem>] [--ui-dir <dir>]
-mcp          (stdio; uses --company or --server)
+mcp          (stdio; requires --company; remote agents use the server's /mcp)
 company      create --name <n> --currency <ISO> --fy-start <1-12> --time-zone <IANA> --template <freelancer|agency|service|blank> [--path <file>]
              list | info
 import       qbo [--realm <id>] [--qbo-tokens <json file>] | csv --kind <accounts|contacts|items|bank-lines> --map <mapping.toml> <file>

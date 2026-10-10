@@ -504,20 +504,20 @@ Each statement is failable. The **Test** column names the planned test, its crat
 | I-2 | `posting` and `ledger` have no I/O dependencies (no tokio, rusqlite, reqwest, std::fs or std::net use). | T-POST-2 `cargo xtask lint` pure-crate rule | xtask / W0-01 |
 | I-2 | Every MVP document type has a golden file per rules version, and every journal entry stores a `rules_version`. | T-POST-3 insta golden suite plus schema NOT NULL | posting / W1-01 |
 | I-3 | `BalancedEntry` cannot be constructed from unbalanced or one-line input. | T-LEDGER-1 proptest plus the constructor being the only public way to build one | ledger / W0-05 |
-| I-3 | Storage refuses to finalize an unbalanced entry, to update or delete final postings or entries, or to add postings to a final entry. | T-STORE-1 one test per trigger (the smoke list in DATA_MODEL.md §6) | store / W0-04 |
-| I-3 | A reversal exactly cancels its original; an entry is reversed at most once. | T-LEDGER-2 proptest at the type level plus T-STORE-2 trigger test | ledger, store / W0-05, W0-04 |
+| I-3 | Storage refuses to finalize an unbalanced entry, to update or delete final postings or entries, or to add postings to a final entry. | T-STORE-1..4 (DATA_MODEL.md §6 cases 1–4; every other case there is T-STORE-n for case n) | store / W0-04 |
+| I-3 | A reversal exactly cancels its original; an entry is reversed at most once. | T-LEDGER-2 proptest at the type level plus T-STORE-6 trigger test | ledger, store / W0-05, W0-04 |
 | I-3 | Random sequences of documents, edits and voids keep the trial balance at 0 and the balance sheet balanced. | T-PROP-1 property test over the full service stack | tests/scenarios / W0-03 harness, active from W2 |
-| I-3 | A void is a reversal; posted documents are never deleted. | T-STORE-3 delete trigger plus T-SALES-1 void test | store, sales / W0-04, W2-01 |
+| I-3 | A void is a reversal; posted documents are never deleted. | T-STORE-9 delete and status triggers plus T-SALES-1 void test | store, sales / W0-04, W2-01 |
 | I-4 | No table stores cash-basis amounts; the cash-basis trial balance balances; a fully settled document recognizes exactly its accrual amounts. | T-REP-1 schema scan plus proptest | reports / W2-04 |
 | I-4 | The spine's cash-basis P&L equals Appendix A. | T-SPINE-CASH golden | tests/scenarios / W0-03 |
-| I-5 | Entries dated on or before the hard-lock date are refused even with an override; soft-locked dates need an override row. | T-STORE-4 trigger tests | store / W0-04 |
+| I-5 | Entries dated on or before the hard-lock date are refused even with an override; soft-locked dates need an override row. | T-STORE-12 trigger tests | store / W0-04 |
 | I-5 | Lock changes and overrides each append an audit event; moving the hard lock earlier requires owner role plus reason. | T-BOOKS-1 | books / W1-02 |
-| I-6 | Audit rows cannot be updated or deleted; sequence gaps and broken links are refused. | T-STORE-5 | store / W0-04 |
-| I-6 | `verify` detects a modified `after_json`, a modified posting amount (with triggers dropped) and a removed event. | T-STORE-6 | store / W0-04 |
+| I-6 | Audit rows cannot be updated or deleted; sequence gaps and broken links are refused. | T-STORE-13 | store / W0-04 |
+| I-6 | `verify` detects a modified `after_json`, a modified posting amount (with triggers dropped) and a removed event. | T-STORE-19 | store / W0-04 |
 | I-6 | Every mutating service command appends at least one audit event with the correct actor type and `via`. | T-AUDIT-1 harness assertion used by every service test | test-support / W0-03 |
 | I-7 | Importing the same QBO data, IIF or CSV twice creates no duplicates and reports the second run as all-duplicate. | T-MIG-1 | migrate / W3-04 |
 | I-7 | Re-importing an OFX file inserts no bank lines; CSV lines without FITID dedupe by hash and ordinal. | T-BANK-1 | banking / W2-03 |
-| I-8 | 200 dimensions with 1,000 values each can be created; line dimensions propagate to postings. | T-BOOKS-2 plus T-POST-4 golden | books, posting / W1-02, W1-01 |
+| I-8 | 200 dimensions can be created, and a dimension can hold 1,000 values (each created through the service, with its audit event); no count limit exists anywhere; line dimensions propagate to postings. | T-BOOKS-2, the `count-limits` lint, and T-POST-4 golden | books, xtask, posting / W1-02, W0-01, W1-01 |
 | I-9 | 2,000 accounts, 100 users, 200 dimensions and 200 custom fields can be created with no limit error; no `MAX_*` count limit exists. | T-LIMIT-1 integration test plus lint | books, identity / W1-02, W1-03 |
 | I-10 | An `agent` token cannot post, void, approve, delete or change locks: every such endpoint returns 403 `auth.agent_forbidden`; agent-created documents are drafts. | T-API-1 | api / W1-05 |
 | I-10 | No MCP tool posts, voids, approves, deletes or moves money; agent tokens cannot be granted `books:write`. | T-MCP-1 tool-list snapshot plus T-ID-2 | mcp, identity / W5-02, W1-03 |

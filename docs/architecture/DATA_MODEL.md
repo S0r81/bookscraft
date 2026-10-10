@@ -28,7 +28,7 @@ Every table is `STRICT`. Foreign keys are enforced (`PRAGMA foreign_keys = ON` o
 | Lock file `<company>.bookscraft.lock` | pid, host, process kind, start time (diagnostics only) | Next to the company file | Held with `std::fs::File::try_lock` |
 | Backups `*.bookscraft.bak-<timestamp>` | Consistent copies made with the SQLite online backup API | `<data_dir>/backups/` by default | Written by the owning process |
 
-`<data_dir>` is `$XDG_DATA_HOME/bookscraft` (Linux), `%APPDATA%\BooksCraft` (Windows) or `~/Library/Application Support/BooksCraft` (macOS), resolved only by the `platform` crate.
+`<data_dir>` is the per-user application data directory that `directories::ProjectDirs` computes for qualifier `org`, organization `BooksCraft` and application `BooksCraft`: typically `$XDG_DATA_HOME/bookscraft` on Linux, `%APPDATA%\BooksCraft\BooksCraft\data` on Windows and `~/Library/Application Support/org.BooksCraft.BooksCraft` on macOS. Only the `platform` crate resolves it; nothing else hard-codes a path.
 
 Open sequence (store crate):
 
@@ -177,7 +177,7 @@ W0-04 implements each line as a Rust test against a fresh company file. The same
 | 16 | Invalid decimals (`1.2.3`, `abc`, `1e5`, `6.`), invalid date (`2026-02-30`) | CHECK |
 | 17 | Account class/subtype mismatch; second singleton system role; parent of a different class; duplicate name ignoring case | CHECK; UNIQUE; `books.account_parent_class_mismatch`; UNIQUE |
 | 18 | Invoice with an AP account; invoice without contact; invoice with a money account; expense without money account | `document.ar_ap_account_subtype`; CHECK (three times) |
-| 19 | `verify` after editing an audit row and a posting with triggers dropped | reports the first broken `seq` and the entry id |
+| 19 | `verify` after, with triggers dropped, editing an audit row's `after_json`, editing a posting amount, and deleting an audit event | reports the first broken `seq` (and the entry id for the posting) in each case |
 | 20 | Leave an entry open and commit | `ledger.entry_left_open`, rolled back |
 
 ## 7. System file tables

@@ -83,7 +83,7 @@ Always pass `--locked`. Prefer `-p <crate>` while iterating; full-workspace buil
 | Spine | Must stay green. Register a capability only when its feature is complete; that activates the matching spine steps. |
 | Platform independence | Use `tempfile` and `Path::join`; no hard-coded `/tmp` or `C:\` |
 
-Tests use fixed clocks and ids (`test_support::FixedClock`, `SeqIds`). They never touch the network: use recorded fixtures.
+Tests use fixed clocks and ids (`test_support::FixedClock`, `SeqIds`). They never touch the network: use recorded fixtures. Never assert that a stub or placeholder another work package will replace stays unimplemented (a 501, `api.not_implemented`, a "coming soon" page): test your own handling of that answer instead, so the test survives when the other package lands. The only exception is a test file your prompt names as owned by the replacing package.
 
 ## 7. Definition of done
 

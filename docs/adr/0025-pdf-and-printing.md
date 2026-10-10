@@ -8,7 +8,7 @@ decision-makers: Owner (S0r81), lead-architect, ui-engineer
 
 ## Context and Problem Statement
 
-Invoices and statements need PDFs for email and download, an in-app preview, and printing on all three OSes, without shelling out (I-13) and without HTML-to-PDF browser engines.
+Invoices and the other sales documents need PDFs for email and download, an in-app preview, and printing on all three OSes, without shelling out (I-13) and without HTML-to-PDF browser engines. Report screens only need printing.
 
 ## Decision Drivers
 

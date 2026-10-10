@@ -40,7 +40,7 @@ Chosen option: the first one, specified in [API.md](../architecture/API.md) §2 
 
 ### Confirmation
 
-Contract tests in W1-05: replay, key reuse, 412, 428, money format rejection; OpenAPI generated and checked into `docs/architecture/openapi.json` by `cargo xtask docs`, with drift failing CI from W1-05 on.
+Contract tests in W1-05: replay, key reuse, 412, 428, money format rejection; OpenAPI generated and checked into `docs/architecture/openapi.json` by `cargo xtask docs`. W1-05 commits the first version; afterwards each Weave regenerates it, and drift fails CI on Weave PRs (work package PRs that add routes cannot all edit the one file without conflicts).
 
 ## Pros and Cons of the Options
 

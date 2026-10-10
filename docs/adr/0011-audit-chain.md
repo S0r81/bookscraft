@@ -39,7 +39,7 @@ Chosen option: **one chain per file** (company file, system file).
 
 ### Confirmation
 
-T-STORE-5 (triggers), T-STORE-6 (verify detects edits), T-AUDIT-1 (every mutating command audits with the right actor).
+T-STORE-13 (triggers), T-STORE-19 (verify detects edits), T-AUDIT-1 (every mutating command audits with the right actor).
 
 ## Pros and Cons of the Options
 

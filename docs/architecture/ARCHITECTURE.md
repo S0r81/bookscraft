@@ -41,7 +41,7 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 | `crates/reports` | AGPL | no | Report engine over `ledger_line`; accrual and cash basis; CSV output | domain, store, ledger, money | W2-04 |
 | `crates/migrate` | AGPL | no | Import pipeline (interchange → services), QBO connector, CSV and IIF sources, parity validation, rollback, export bundle | domain, store, interchange, qbo, iif, money | W3-04, W4-03 |
 | `crates/identity` | AGPL | no | Users, memberships, sessions, API and agent tokens, authentication, server secret store (envelope encryption) | domain, store | W1-03 |
-| `crates/render` | AGPL | no | Typst invoice, statement and report templates → PDF and SVG preview; email via SMTP | domain, money | W4-04 |
+| `crates/render` | AGPL | no | Typst templates for sales documents (invoice, estimate, sales receipt, credit memo, refund receipt) → PDF and SVG preview; email via SMTP | domain, store, money | W4-04 |
 | `crates/api` | AGPL | no | axum router, middleware (auth, idempotency, ETag, errors, limits), OpenAPI document, route modules per area | domain, api-types, money | W1-05 |
 | `crates/mcp` | AGPL | no | MCP server (rmcp): read and draft tools with scopes | domain | W5-02 |
 | `crates/app` | AGPL | no | Composition root: builds every service from a `store::Stores` plus `domain::ports::Infra`; job runner | domain, store, books, sales, purchases, banking, reports, migrate, identity, render, api, mcp | W0-01 (compose), W1-05 |
@@ -110,7 +110,7 @@ flowchart TB
   migrate --> qbo
   migrate --> iif
   identity --> store
-  render --> domain
+  render --> store
   api --> domain
   api --> apitypes
   mcp --> domain
@@ -149,6 +149,8 @@ Arrows are direct dependencies; transitive ones are omitted. Test-only crates ar
 | D-9 | Every `.rs` file starts with the SPDX header of its crate's license | I-12 |
 | D-10 | No authored `.js`, `.ts`, `.jsx`, `.tsx` or `package.json` anywhere in the repo | D-1 owner decision |
 
+D-1, D-7 and D-8 are about normal dependencies. Dev-dependencies used only by tests (for example `test-support`, `app` or `bookscraft-scenarios` in a crate's integration tests) are exempt.
+
 ## 4. Contracts (Wave 0)
 
 ### 4.1 `domain` modules
@@ -157,7 +159,7 @@ Arrows are direct dependencies; transitive ones are omitted. Test-only crates ar
 |---|---|
 | `ids` | One newtype per entity id over `uuid::Uuid` (v7): `CompanyId`, `AccountId`, `ContactId`, `ItemId`, `TermId`, `PaymentMethodId`, `TaxAgencyId`, `TaxRateId`, `TaxCodeId`, `DimensionId`, `DimensionValueId`, `CustomFieldId`, `AttachmentId`, `DocumentId`, `LineKey`, `JournalEntryId`, `PostingId`, `SettlementId`, `BankFeedId`, `BankImportId`, `BankTxnId`, `BankRuleId`, `ReconciliationId`, `ImportRunId`, `UserId`, `TokenId`, `JobId`, `AuditEventId`, `RequestId` |
 | `time` | `Date` (civil), `Timestamp` (UTC), `DateRange` |
-| `entities` | `Company`, `CompanySettings`, `Account` (`AccountClass`, `AccountSubtype`, `SystemRole`), `Contact` (`ContactRoles`, `Address`), `Item` (`ItemKind`), `Term`, `PaymentMethod`, `TaxAgency`, `TaxRate`, `TaxCode`, `Dimension`, `DimensionValue`, `CustomFieldDef`, `Attachment` |
+| `entities` | `Company`, `CompanySettings`, `Account` (`AccountClass`, `AccountSubtype`, `SystemRole`), `Contact` (`ContactRoles`, `Address`), `Item` (`ItemKind`), `Term`, `PaymentMethod`, `TaxAgency`, `TaxRate`, `TaxCode`, `Dimension`, `DimensionValue`, `CustomFieldDef`, `Attachment`, `Job` (`JobKind`, `JobStatus`, JSON payload, attempts, result) |
 | `documents` | `DocumentType` (17 variants, DATA_MODEL §4.1), `DocumentStatus`, `Document` (header + `Vec<DocumentLine>` + `Vec<TaxLine>` + `Vec<Application>` + dimensions), `DocumentLine` (`LineKind`), `Application` (settlement request), `EstimateStatus`, `TaxMode`, `Discount` |
 | `ledger_view` | `JournalView`, `PostingView`, `SettlementView`, `ClearingState` (read models returned by queries) |
 | `commands` | One struct per write: `CreateAccount`, `UpdateAccount`, `SaveInvoice`, `PostDocument`, `VoidDocument`, `ApproveDocument`, `SetPeriodLocks`, `StartReconciliation`, ... (one per API write operation, API.md §5) |
@@ -233,6 +235,18 @@ pub const CAPABILITIES: &[bookscraft_domain::capability::Capability];
 
 W0-01 writes the skeleton: every crate, every `build` and `CAPABILITIES`, the port trait names (empty), `Services`, `Infra`, the three port bundles, `Capability` with all variants, `DomainError`, `stubs::Unimplemented`, `store::Stores`, and `app::compose(stores, infra) -> Services`, which calls every `build`. W0-02 fills the ports with their methods without renaming any skeleton item. `app::compose` never needs editing when a crate is implemented; W1-05 adds the job runner and the HTTP state around it.
 
+**Infrastructure constructors.** The production `Infra` (section 8) is assembled by `app::infra(stores: &Stores, secrets: Arc<dyn SecretStore>) -> Infra` (W1-05): a system clock, UUIDv7 ids, and these fixed constructors, which W0-01 writes as stubs (`stubs::Unimplemented`, or an empty list) and their owners fill in later without touching `app`:
+
+| Constructor | Returns | Implemented by |
+|---|---|---|
+| `books::infra::tax_rates()` | `Arc<dyn TaxRateProvider>` (`ManualRates`) | W1-02 |
+| `books::infra::locales()` | `Vec<Arc<dyn LocalePack>>` (`EnUs`) | W1-02 |
+| `identity::infra::envelope_secrets(stores: Stores, kek: Zeroizing<Vec<u8>>, kek_version: u32)` | `Result<Arc<dyn SecretStore>, DomainError>` (server secrets) | W1-03 |
+| `banking::feeds::providers(secrets: Arc<dyn SecretStore>)` | `Vec<Arc<dyn BankProvider>>` (`FileProvider` and `SimpleFin`; empty until then, since statement import does not go through a provider) | W4-05 |
+| `render::infra::mailer(stores: Stores, secrets: Arc<dyn SecretStore>)` | `Arc<dyn Mailer>` (`Smtp`, reading the SMTP settings at send time) | W4-04 |
+
+Shells choose only the secret store: the desktop passes `platform::secrets::Keychain` (W3-05); `bookscraft serve` passes `app::server_secrets(stores, kek, kek_version)` (W1-05), which calls `identity::infra::envelope_secrets`. Tests build `Infra` from the fakes in `test-support`. `domain::ports` re-exports `zeroize::Zeroizing`, so implementers and shells need no direct `zeroize` dependency.
+
 ### 4.6 Data access and shared write paths
 
 Services own their SQL. `store` opens files and hands out transactions; it does not hold a repository per table, because it is a Weave-only crate after Wave 0 and services must be able to add queries without touching it.
@@ -256,7 +270,7 @@ Services own their SQL. `store` opens files and hands out transactions; it does 
 | API router | In-process, reached through the Tauri custom protocol; no TCP port | In-process, over HTTP(S) | — | Remote, over HTTPS with a bearer token | — | — |
 | Services and store | In-process | In-process | In-process | Remote | In-process | Remote (server's) |
 | Company file lock | Held by the desktop app | Held by the server for each open company | Held by the CLI for the run | — | Held by the MCP process | — |
-| Authentication | Desktop principal (the OS profile user); optional app password | Sessions (cookie) and bearer tokens | Desktop principal of the system file | Bearer token | Agent token from the system file, or the desktop principal with agent actor type | Agent token (bearer) on `/mcp` |
+| Authentication | Desktop principal (the OS profile user); optional app password | Sessions (cookie) and bearer tokens | Desktop principal of the system file | Bearer token | The desktop principal with actor type `agent` | Agent token (bearer) on `/mcp` |
 | Jobs | In-process runner | In-process runner | Runs its own job inline | Server's | — | Server's |
 | Transport | Custom protocol (Linux/macOS `bookscraft://localhost/`, Windows `http://bookscraft.localhost/`) | HTTP/1.1 and HTTP/2, TLS via rustls (`axum-server`) or a reverse proxy | — | HTTPS | stdio (JSON-RPC) | Streamable HTTP |
 
@@ -374,7 +388,7 @@ flowchart LR
 | Capabilities | `CAPABILITIES` const in each service crate | A crate adds only its own capabilities |
 | HTTP routes | `crates/api/src/routes/<area>.rs` each exposing `pub fn router() -> Router<ApiState>` and `pub fn openapi() -> utoipa::openapi::OpenApi`; `routes/mod.rs` merges all areas (written once in W1-05 with empty placeholders) | A WP owns its area file only |
 | UI routes and pages | `crates/ui/src/routes.rs` lists every MVP route (written once in W2-05); each `crates/ui/src/pages/<area>/` exports fixed component names | A WP owns its page directories only |
-| Error codes | Constants in the owning crate; the string namespace matches the crate (store owns the trigger codes in schema.sql) | `cargo xtask lint` fails on duplicate code strings; `cargo xtask docs` regenerates the API.md code table in the Weave |
+| Error codes | Constants in the owning crate; the string namespace matches the crate (store owns the trigger codes in schema.sql) | `cargo xtask lint` fails on duplicate code strings; `cargo xtask docs` regenerates `docs/architecture/error-codes.md` in the Weave |
 | Migrations | `crates/store/migrations/NNNN_<slug>.sql` | Only a Weave adds one (CCR) |
 | Workspace manifest and lockfile | Root `Cargo.toml`, `Cargo.lock`, every `crates/*/Cargo.toml` | Only W0-01 and Weaves edit them; CI builds with `--locked` |
 | xtask subcommands | Pre-registered in W0-01 (`doctor`, `lint`, `scope`, `ci`, `spine`, `hook`, `warm`, `ui`, `e2e`, `package`, `docs`, `dco`), one module file each | Later WPs fill a pre-registered module only if their OWNERSHIP row lists it (`ui.rs` and `e2e.rs`: W2-05; `package.rs`: W5-01; `e2e.rs`: W5-04) |
@@ -468,7 +482,7 @@ Rules:
 | Design system | `crates/ui/src/components/`: `DataTable` (virtualized rows, keyboard cell navigation, sortable columns), `MoneyInput`, `DateInput`, `ComboBox` (type-ahead), `LineItemsGrid`, `Dialog`, `Toast`, `FormField` (label, description, error), `PrintPreview` (SVG pages) |
 | Keyboard-first | Global shortcuts (section 10.1); every action reachable without a mouse; focus visible; tab order follows reading order |
 | Accessibility | Semantic HTML, labelled inputs, ARIA roles for grids and dialogs, live region for toasts, 4.5:1 contrast; verified with Orca (GNOME) in the spike and in UI acceptance tests |
-| Print and PDF | Previews are SVG pages rendered by `render` (Typst); Print uses the webview print dialog on a print stylesheet; Save as PDF downloads the Typst PDF |
+| Print and PDF | Sales documents: previews are SVG pages rendered by `render` (Typst); Print uses the webview print dialog on a print stylesheet; Save as PDF downloads the Typst PDF. Report screens print through the same dialog and print stylesheet; there is no report PDF endpoint in MVP |
 | Routes | Pre-registered in W2-05 (section 10.2) |
 | Testing | View-model logic (formatting, validation, keyboard maps, state transitions) lives in plain Rust modules tested natively with `cargo test -p bookscraft-ui`. Each page work package owns one end-to-end file `tests/e2e/tests/ui_<area>.rs` that drives the web build by keyboard through WebDriver (`fantoccini` with WebKitWebDriver, the same engine as the Linux desktop), started by `cargo xtask e2e --web`. Screen-reader and GPU checks are done by the owner on Fedora. |
 
@@ -519,7 +533,7 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 
 ## 12. Background jobs, email and rendering
 
-- **Jobs** (ADR-0024). The `job` table is in the system file. `app` runs one runner thread per process that claims due jobs (`queued`, `run_after <= now`), runs them as the creating principal, and retries with backoff (1 min, 5 min, 30 min, then failed). Kinds: `email_send`, `import`, `export`, `bank_sync`, `backup`, `verify`, `reversing_entry`. The CLI runs a job inline.
+- **Jobs** (ADR-0024). The `job` table is in the system file. `app` runs one runner thread per process that claims due jobs (`queued`, `run_after <= now`), runs them as the creating principal, and retries with backoff (1 min, 5 min, 30 min, then failed). Kinds: `email_send`, `import`, `export`, `bank_sync`, `backup`, `verify`, `reversing_entry`. Each kind has exactly one owning port, which has a method `run_job(&self, ctx: &Ctx, job: &Job) -> Result<serde_json::Value, DomainError>` (W0-02; `domain::ports::JOB_OWNERS` lists them): `email_send` → `RenderService`, `import` → `ImportService`, `export` → `ExportService`, `bank_sync` → `BankingService`, `backup` and `verify` → `CompanyService`, `reversing_entry` → `BooksService`. The runner dispatches by kind. The CLI runs a job inline.
 - **Email.** `render::mail::Smtp` uses lettre over TLS. SMTP settings live in the system file (server) or the desktop profile; the password goes through `SecretStore`. Invoices are sent as PDF attachments.
 - **Rendering.** Typst is used as a library with embedded fonts (no system font scan in tests). Templates are data files in `crates/render/templates/`. Output is a PDF document or SVG pages for preview. The renderer is deterministic: golden PDFs are compared by extracted text and page count, SVG by snapshot.
 
@@ -546,14 +560,14 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 | `cargo xtask doctor [--fix]` | Checks the pinned toolchain, components, targets and cargo tools; `--fix` installs what is missing |
 | `cargo xtask lint` | Dependency rules D-1..D-10, OWNERSHIP ↔ CODEOWNERS mirror, SPDX headers, unique error codes, no CRLF |
 | `cargo xtask scope <WP>` | Fails if the branch changes paths outside the WP's owned paths (vs `origin/main`) |
-| `cargo xtask ci` | Runs what CI runs: fmt check, clippy `-D warnings`, tests, lint, deny (if installed), spine |
+| `cargo xtask ci` | Runs what CI runs: fmt check, clippy `-D warnings`, tests (every crate except `bookscraft-e2e`), lint, deny (if installed), spine |
 | `cargo xtask spine` | Runs the scenario spine and prints passed, failed and pending steps |
 | `cargo xtask hook <fmt\|stop\|guard>` | Claude Code hooks (`.claude/settings.json`) |
 | `cargo xtask warm` | `cargo fetch` plus a check of the light crates; used by the SessionStart hook |
 | `cargo xtask ui <build\|serve>` | Builds the WASM UI; serves it with a dev server that proxies `/api` to a running `bookscraft serve` |
-| `cargo xtask e2e [--web\|--desktop]` | Builds the UI, starts WebKitWebDriver (or `tauri-driver`) and Xvfb when needed, then runs `cargo test --locked -p bookscraft-e2e`; CI job `e2e (ubuntu-latest)`, not a required check until Weave 5 decides |
+| `cargo xtask e2e [--web\|--desktop]` | Builds the UI, starts WebKitWebDriver (or `tauri-driver`) and Xvfb when needed, passes the driver's URL in `BOOKSCRAFT_WEBDRIVER_URL`, then runs `cargo test --locked -p bookscraft-e2e` (from W5-04: `--web` runs the `ui_*` and `api_*` targets, `--desktop` the `desktop_*` targets); CI job `e2e (ubuntu-latest)`, not a required check until Weave 5 decides |
 | `cargo xtask package <appimage\|deb\|rpm\|flatpak\|msi\|dmg>` | Packaging (W5-01) |
-| `cargo xtask docs` | Regenerates `docs/architecture/openapi.json` and the error-code table |
+| `cargo xtask docs [--check]` | Regenerates `docs/architecture/openapi.json` (from the `openapi-json` binary in `api`) and `docs/architecture/error-codes.md` (from the error-code constants); `--check` fails when either is stale; CI runs the check on Weave PRs, which regenerate both |
 | `cargo xtask dco --pr-body <file>` | Checks the PR description carries a valid `Signed-off-by:` line |
 
 CI (GitHub Actions, W0-01) runs these required checks on every PR: `fmt`, `clippy`, `lint`, `test (ubuntu-latest)`, `test (windows-latest)`, `test (macos-latest)`, `deny`, `spine`, `scope`, `dco`.

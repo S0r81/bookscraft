@@ -26,7 +26,9 @@ Desktop is first-class (owner decision D-2): Linux first for development and fir
 
 Chosen option: the first one.
 
-**MVP (W5-01).** `cargo xtask package appimage|deb|rpm|flatpak` produces Linux artifacts. A GitHub Actions release workflow builds them on tags `v*` and attaches them to a GitHub release with SHA-256 sums. The Flatpak manifest lives in `packaging/flatpak/`; Flathub submission happens after MVP.
+**Application identifier.** `io.github.s0r81.bookscraft`, following Flathub's rule for apps hosted on GitHub (`io.github.<user>.<repo>`, lowercase domain portion; docs.flathub.org "Requirements", checked 2026-10-10). It is the Tauri `identifier` (W3-05), the keychain service name for stored secrets (W3-05), the Flatpak app id, and the name of the desktop entry and AppStream metainfo files (W5-01). Changing it after the first release orphans keychain entries and Flatpak data, so a change (for example to a project domain) must be decided before W3-05 starts. Data directories are unaffected: they come from `platform::dirs` (DATA_MODEL §2).
+
+**MVP (W5-01).** `cargo xtask package appimage|deb|rpm|flatpak` produces Linux artifacts. A GitHub Actions release workflow builds them on tags `v*`, together with a tarball of the `bookscraft` CLI and server binary for x86_64 Linux, and attaches them to a draft GitHub release with SHA-256 sums. The Flatpak manifest lives in `packaging/flatpak/`; Flathub submission happens after MVP. The Tauri bundler fetches its AppImage tooling (`linuxdeploy`) at build time and caches it (tauri-bundler release notes, v1.0.0-rc.10: "Pull correct linuxdeploy AppImage", "Cache bundling tools in a directory shared by all tauri projects"), so AppImages are built where that download works: GitHub Actions or the owner's machine, not necessarily a cloud session. W5-01 records which bundle types download anything.
 
 **Windows + macOS milestone (ROADMAP M-WM).**
 
@@ -42,7 +44,7 @@ Chosen option: the first one.
 
 ### Confirmation
 
-W5-01 acceptance: each Linux artifact installs and launches in a clean container or VM (CI job with `xvfb` for AppImage and deb; rpm checked on Fedora by the owner); the release workflow dry-runs on a tag in a fork.
+W5-01 acceptance: each Linux artifact installs and launches on a fresh CI runner (`bookscraft-desktop --smoke-test` under `xvfb` for AppImage and deb; rpm checked on Fedora by the owner); the release workflow's build and smoke jobs run on every pull request that touches packaging, and its publish job runs only on `v*` tags, creating a draft release that the owner publishes.
 
 ## Pros and Cons of the Options
 

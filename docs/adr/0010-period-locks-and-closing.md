@@ -40,7 +40,7 @@ Chosen option:
 
 ### Confirmation
 
-T-STORE-4 (trigger), T-BOOKS-1 (audited lock changes, owner-only unlock), spine step S30.
+T-STORE-12 (trigger), T-BOOKS-1 (audited lock changes, owner-only unlock), spine step S30.
 
 ## Pros and Cons of the Options
 

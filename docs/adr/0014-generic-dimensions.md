@@ -39,7 +39,7 @@ Chosen option:
 
 ### Confirmation
 
-T-BOOKS-2 (200 dimensions × 1,000 values), T-POST-4 (propagation golden), spine steps S06 and S15.
+T-BOOKS-2 (200 dimensions, and one dimension with 1,000 values, through the service), the `count-limits` lint (no cap anywhere), T-POST-4 (propagation golden), spine steps S06 and S15.
 
 ## Pros and Cons of the Options
 
