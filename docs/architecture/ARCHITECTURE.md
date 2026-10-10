@@ -504,7 +504,7 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 | Area | Rule |
 |---|---|
 | Desktop | Single OS user. Optional app password (argon2id) gates the UI at start. Company and system files are created `0600` where the OS supports it. No network listener. |
-| Server authentication | Local accounts (argon2id; login rate-limited per username and per IP in memory). Sessions in an HttpOnly, Secure, `SameSite=Strict` cookie; mutating browser requests also need header `X-BooksCraft-Client: ui`. API and agent tokens are `Authorization: Bearer bc_<32 random bytes, base32>` and stored as SHA-256. OIDC arrives in v1. |
+| Server authentication | Local accounts (argon2id; login rate-limited per username and per IP in memory). Sessions in an HttpOnly, Secure, `SameSite=Strict` cookie; mutating browser requests also need header `X-BooksCraft-Client: ui`. API and agent tokens are `Authorization: Bearer bc_<32 random bytes, base64url without padding>` and stored as SHA-256. OIDC arrives in v1. |
 | Authorization | Role × permission matrix in `domain::auth` (API.md §6); token scopes narrow it further; `agent` principals can never post, void, approve, delete, change locks, manage users or read secrets (I-10). |
 | Secrets | `SecretStore` only: OS keychain on desktop, envelope encryption on the server (AES-256-GCM data keys wrapped by a key-encryption key from the server config file or environment; `kek_version` allows rotation). Secrets never reach logs, audit events or exports. |
 | Input limits | JSON bodies up to 2 MB; uploads up to 25 MB per attachment; statement files up to 10 MB; CSV imports up to 200,000 rows; every list endpoint is paginated (max 500). |
