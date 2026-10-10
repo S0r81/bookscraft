@@ -29,8 +29,10 @@ Chosen option: the first one (owner default, Q-4).
 
 * `*.rs`;
 * `*.toml`, `*.yml`/`*.yaml`, `*.sql`, `*.md`, `*.json` (data);
-* `*.css`, the single `crates/ui/index.html` host page, `*.typ` templates, fonts, `*.svg` and `*.png` icons;
-* the Flatpak manifest and an optional container file for the server image.
+* `*.css`, the single `crates/ui/index.html` host page, `*.typ` templates, fonts (`*.ttf`, `*.otf`, `*.woff2`), icons (`*.svg`, `*.png`, `*.ico`, `*.icns`);
+* the Flatpak manifest, the Linux desktop entry and AppStream metadata (`*.desktop`, `*.metainfo.xml`), and an optional container file for the server image;
+* test fixtures and snapshots in formats BooksCraft reads or writes: `*.ofx`, `*.qfx`, `*.qbo`, `*.iif`, `*.csv`, `*.xlsx`, `*.jsonl`, `*.zip`, `*.txt`, and `insta` snapshots (`*.snap`);
+* repository metadata: `LICENSE`, `LICENSES/*.txt`, `.github/CODEOWNERS`, `.gitattributes`, `.gitignore`, `Cargo.lock`.
 
 **Allowed shell:**
 

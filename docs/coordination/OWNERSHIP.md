@@ -33,15 +33,15 @@ Every WP also owns two coordination files, which are not repeated in the rows:
 | W2-02 | 2 | ledger-engineer | wp/W2-02-purchases | `crates/purchases/src/**`, `crates/purchases/tests/**`, `crates/api/src/routes/purchases.rs` |
 | W2-03 | 2 | bank-feeds-engineer | wp/W2-03-banking | `crates/banking/src/**`, `crates/banking/tests/**`, `crates/api/src/routes/banking.rs` |
 | W2-04 | 2 | ledger-engineer | wp/W2-04-reports | `crates/reports/src/**`, `crates/reports/tests/**`, `crates/api/src/routes/reports.rs` |
-| W2-05 | 2 | ui-engineer | wp/W2-05-ui-foundation | `crates/ui/src/**`, `crates/ui/tests/**`, `crates/ui/index.html`, `crates/ui/style/**`, `crates/ui/assets/**`, `xtask/src/ui.rs` |
+| W2-05 | 2 | ui-engineer | wp/W2-05-ui-foundation | `crates/ui/src/**`, `crates/ui/tests/**`, `crates/ui/index.html`, `crates/ui/style/**`, `crates/ui/assets/**`, `xtask/src/ui.rs`, `xtask/src/e2e.rs`, `tests/e2e/src/**`, `tests/e2e/tests/ui_foundation.rs` |
 | W2-W | 2 | lead-architect | weave/W2 | `**` |
-| W3-01 | 3 | ui-engineer | wp/W3-01-ui-sales | `crates/ui/src/pages/sales/**` |
-| W3-02 | 3 | ui-engineer | wp/W3-02-ui-purchases-banking | `crates/ui/src/pages/purchases/**`, `crates/ui/src/pages/banking/**` |
+| W3-01 | 3 | ui-engineer | wp/W3-01-ui-sales | `crates/ui/src/pages/sales/**`, `tests/e2e/tests/ui_sales.rs` |
+| W3-02 | 3 | ui-engineer | wp/W3-02-ui-purchases-banking | `crates/ui/src/pages/purchases/**`, `crates/ui/src/pages/banking/**`, `tests/e2e/tests/ui_purchases_banking.rs` |
 | W3-03 | 3 | import-migration-engineer | wp/W3-03-qbo-mapper | `crates/qbo/src/**`, `crates/qbo/tests/**`, `crates/qbo/fixtures/**` |
 | W3-04 | 3 | import-migration-engineer | wp/W3-04-migrate | `crates/migrate/src/**`, `crates/migrate/tests/**`, `crates/migrate/fixtures/**`, `crates/api/src/routes/imports.rs` |
 | W3-05 | 3 | platform-release-engineer | wp/W3-05-desktop | `crates/platform/src/**`, `crates/platform/tests/**`, `crates/desktop/src/**`, `crates/desktop/tests/**`, `crates/desktop/build.rs`, `crates/desktop/tauri.conf.json`, `crates/desktop/capabilities/**`, `crates/desktop/icons/**` |
 | W3-W | 3 | lead-architect | weave/W3 | `**` |
-| W4-01 | 4 | ui-engineer | wp/W4-01-ui-reports-close | `crates/ui/src/pages/reports/**`, `crates/ui/src/pages/close/**`, `crates/ui/src/pages/audit/**`, `crates/ui/src/pages/migrate/**` |
+| W4-01 | 4 | ui-engineer | wp/W4-01-ui-reports-close | `crates/ui/src/pages/reports/**`, `crates/ui/src/pages/close/**`, `crates/ui/src/pages/audit/**`, `crates/ui/src/pages/migrate/**`, `tests/e2e/tests/ui_reports_close.rs` |
 | W4-02 | 4 | api-engineer | wp/W4-02-cli | `crates/cli/src/**`, `crates/cli/tests/**` |
 | W4-03 | 4 | import-migration-engineer | wp/W4-03-qbo-connector | `crates/migrate/src/qbo/**`, `crates/migrate/tests/qbo_*.rs`, `crates/migrate/fixtures/qbo_http/**` |
 | W4-04 | 4 | api-engineer | wp/W4-04-render | `crates/render/src/**`, `crates/render/tests/**`, `crates/render/templates/**`, `crates/render/fonts/**`, `crates/api/src/routes/render.rs` |
@@ -49,8 +49,8 @@ Every WP also owns two coordination files, which are not repeated in the rows:
 | W4-W | 4 | lead-architect | weave/W4 | `**` |
 | W5-01 | 5 | platform-release-engineer | wp/W5-01-packaging | `packaging/**`, `.github/workflows/release.yml`, `xtask/src/package.rs`, `crates/desktop/tauri.conf.json`, `crates/desktop/icons/**` |
 | W5-02 | 5 | api-engineer | wp/W5-02-mcp | `crates/mcp/src/**`, `crates/mcp/tests/**` |
-| W5-03 | 5 | ui-engineer | wp/W5-03-ui-print-polish | `crates/ui/src/components/**`, `crates/ui/src/shell/**`, `crates/ui/src/pages/**`, `crates/ui/tests/**`, `crates/ui/style/**` |
-| W5-04 | 5 | qa-verifier | wp/W5-04-e2e-pilot | `tests/e2e/src/**`, `tests/e2e/tests/**`, `docs/process/PILOT_RUNBOOK.md`, `docs/process/RELEASE_CHECKLIST.md` |
+| W5-03 | 5 | ui-engineer | wp/W5-03-ui-print-polish | `crates/ui/src/components/**`, `crates/ui/src/shell/**`, `crates/ui/src/pages/**`, `crates/ui/tests/**`, `crates/ui/style/**`, `tests/e2e/tests/ui_print_polish.rs` |
+| W5-04 | 5 | qa-verifier | wp/W5-04-e2e-pilot | `xtask/src/e2e.rs`, `tests/e2e/src/**`, `tests/e2e/tests/api_*.rs`, `tests/e2e/tests/desktop_*.rs`, `docs/process/PILOT_RUNBOOK.md`, `docs/process/RELEASE_CHECKLIST.md` |
 | W5-W | 5 | lead-architect | weave/W5 | `**` |
 
 ## Paths only a Weave changes after Wave 0
@@ -59,12 +59,13 @@ The rows above are authoritative. No row in Waves 1–5 covers the paths below, 
 
 | Path | Row exceptions | Why |
 |---|---|---|
-| `Cargo.toml`, `Cargo.lock`, `crates/*/Cargo.toml`, `rust-toolchain.toml`, `deny.toml`, `deny-mit.toml`, `.cargo/**` | none | Dependencies are pinned once; CI builds with `--locked` |
+| `Cargo.toml`, `Cargo.lock`, `crates/*/Cargo.toml`, `tests/*/Cargo.toml`, `xtask/Cargo.toml`, `rust-toolchain.toml`, `deny.toml`, `deny-mit.toml`, `.cargo/**` | none | Dependencies are pinned once; CI builds with `--locked` |
 | `crates/domain/**`, `crates/api-types/**`, `crates/money/**` | none | Shared contracts |
 | `crates/store/**` (including `crates/store/migrations/**`) | none | Schema and write path are contracts; migrations are numbered only in a Weave |
 | `crates/app/src/**`, `crates/api/src/lib.rs`, `crates/api/src/routes/mod.rs` | W1-05 creates them | Registration points (ARCHITECTURE.md §7) |
 | `crates/ui/src/lib.rs`, `crates/ui/src/routes.rs` | W2-05 creates them | UI registration points |
-| `xtask/**` | `xtask/src/ui.rs` (W2-05), `xtask/src/package.rs` (W5-01) | Tooling |
+| `xtask/**` | `xtask/src/ui.rs` (W2-05), `xtask/src/e2e.rs` (W2-05, then W5-04), `xtask/src/package.rs` (W5-01) | Tooling |
+| `crates/test-support/**`, `tests/scenarios/**` | none | Shared test harness and the scenario spine: only QA (W0-03) and Weaves change them (ADR-0029) |
 | `.github/**` | `.github/workflows/release.yml` (W5-01) | CI and repository settings |
 | `.claude/**`, `CLAUDE.md`, `README.md`, `CONTRIBUTING.md`, `LICENSE`, `LICENSES/**` | none | Process and policy |
 | `docs/architecture/**` | `docs/architecture/interchange-v1.md` (W1-04), `docs/architecture/openapi.json` (W1-05) | Specs |
@@ -77,8 +78,8 @@ The rows above are authoritative. No row in Waves 1–5 covers the paths below, 
 | Check | Rule |
 |---|---|
 | Parse | Every row has a WP id, a wave 0–5, an agent that exists in `.claude/agents/`, a branch `wp/<WP>-<slug>` or `weave/W<n>`, and at least one backticked glob. |
-| Disjoint within a wave | For any two rows of the same wave (Waves 1–5, and W0-06 against the other Wave 0 rows), no glob of one, with its wildcard tail removed, is a prefix of a glob of the other. Weave rows (`**`) are exempt; W0-01..W0-05 are exempt because they run one after another. |
-| Weave-only paths | No row of Waves 1–5 matches a path in the table above, except its listed row exceptions. |
+| Disjoint within a wave | For any two rows of the same wave (Waves 1–5, and W0-06 against the other Wave 0 rows), no path can match a glob of both rows. Globs are compared segment by segment: `**` matches zero or more segments, `*` matches within one segment. Weave rows (`**`) are exempt; W0-01..W0-05 are exempt because they run one after another. |
+| Weave-only paths | No glob of a Wave 1–5 row can match a path in the table above, unless that glob is listed in the row exceptions or the exception names the row's WP as the creator. |
 | Mirror | `.github/CODEOWNERS` lists the same globs per WP, in the same order (generated by `cargo xtask lint --fix-codeowners`). |
 
 ## Hotspot rules

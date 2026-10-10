@@ -105,13 +105,18 @@
 /crates/ui/style/**  @S0r81
 /crates/ui/assets/**  @S0r81
 /xtask/src/ui.rs  @S0r81
+/xtask/src/e2e.rs  @S0r81
+/tests/e2e/src/**  @S0r81
+/tests/e2e/tests/ui_foundation.rs  @S0r81
 
 # W3-01 ui-engineer
 /crates/ui/src/pages/sales/**  @S0r81
+/tests/e2e/tests/ui_sales.rs  @S0r81
 
 # W3-02 ui-engineer
 /crates/ui/src/pages/purchases/**  @S0r81
 /crates/ui/src/pages/banking/**  @S0r81
+/tests/e2e/tests/ui_purchases_banking.rs  @S0r81
 
 # W3-03 import-migration-engineer
 /crates/qbo/src/**  @S0r81
@@ -139,6 +144,7 @@
 /crates/ui/src/pages/close/**  @S0r81
 /crates/ui/src/pages/audit/**  @S0r81
 /crates/ui/src/pages/migrate/**  @S0r81
+/tests/e2e/tests/ui_reports_close.rs  @S0r81
 
 # W4-02 api-engineer
 /crates/cli/src/**  @S0r81
@@ -179,9 +185,12 @@
 /crates/ui/src/pages/**  @S0r81
 /crates/ui/tests/**  @S0r81
 /crates/ui/style/**  @S0r81
+/tests/e2e/tests/ui_print_polish.rs  @S0r81
 
 # W5-04 qa-verifier
+/xtask/src/e2e.rs  @S0r81
 /tests/e2e/src/**  @S0r81
-/tests/e2e/tests/**  @S0r81
+/tests/e2e/tests/api_*.rs  @S0r81
+/tests/e2e/tests/desktop_*.rs  @S0r81
 /docs/process/PILOT_RUNBOOK.md  @S0r81
 /docs/process/RELEASE_CHECKLIST.md  @S0r81

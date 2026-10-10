@@ -301,6 +301,8 @@ Permission: `reports.read` (audit events: `audit.read`). Agents may read reports
 
 **Agent rule (I-10).** A principal with `actor_type = agent` is refused (403 `auth.agent_forbidden`) on: post, approve, void, repost, delete of non-own drafts, period locks, reconciliation, bank match, exclude and undo, imports, exports, backups, settings, members, users, tokens, bank feeds and audit events. This holds whatever scopes are granted (T-API-1).
 
+**Machine-readable permissions.** Every operation in the generated OpenAPI document carries two extensions: `x-bookscraft-permission` (a permission name from the table above, or `none` or `authenticated`) and `x-bookscraft-agent` (`true` when an agent may call it, matching the Agent column in section 5). Handlers check the permission before calling a service, so a refusal does not depend on the service being implemented. T-API-1 enumerates the operations from `api::openapi()` and calls every operation marked `x-bookscraft-agent: false` with an agent token, expecting 403 `auth.agent_forbidden`; T-API-2 fails when an operation lacks either extension. Area work packages therefore add their routes to the test automatically.
+
 ## 7. Shared DTO shapes
 
 ### 7.1 Document
@@ -389,8 +391,8 @@ Input-only fields: `post` (boolean, default false) and `lock_override_reason` (s
 | Topic | Rule |
 |---|---|
 | SDK | `rmcp` 3.x with features `server`, `macros`, `transport-io`, `transport-streamable-http-server`, `schemars` |
-| Transports | stdio (`bookscraft mcp --company <file>` or `--server <url> --token <t>`) and streamable HTTP at `/mcp` in server mode |
-| Authentication | Agent token (bearer on HTTP; `--token` or `BOOKSCRAFT_TOKEN` on stdio remote). Locally, the process acts as the desktop principal with `actor_type = agent`, so I-10 holds in every mode. |
+| Transports | stdio (`bookscraft mcp --company <file>` or `--server <url> --token-file <file>`) and streamable HTTP at `/mcp` in server mode |
+| Authentication | Agent token (bearer on HTTP; `--token-file` or `BOOKSCRAFT_TOKEN` on stdio remote). Locally, the process acts as the desktop principal with `actor_type = agent`, so I-10 holds in every mode. |
 | Resources and prompts | None in MVP |
 | Output | Tool results are JSON objects with the same shapes as the HTTP DTOs, plus a short text summary |
 
@@ -412,13 +414,13 @@ Never exposed as tools: post, approve, void, repost, delete of others' drafts, p
 ## 9. CLI surface (W4-02)
 
 ```text
-bookscraft [--company <file> | --server <url> --token <token>] [--data-dir <dir>] [--format table|json|csv] [--yes] <command>
+bookscraft [--company <file> | --server <url> [--token-file <file>]] [--data-dir <dir>] [--format table|json|csv] [--yes] <command>
 
 serve        --config <file> --bind <addr:port> [--tls-cert <pem> --tls-key <pem>] [--ui-dir <dir>]
 mcp          (stdio; uses --company or --server)
 company      create --name <n> --currency <ISO> --fy-start <1-12> --time-zone <IANA> --template <freelancer|agency|service|blank> [--path <file>]
              list | info
-import       qbo [--realm <id>] [--token-file <json>] | csv --kind <accounts|contacts|items|bank-lines> --map <mapping.toml> <file>
+import       qbo [--realm <id>] [--qbo-tokens <json file>] | csv --kind <accounts|contacts|items|bank-lines> --map <mapping.toml> <file>
              | interchange <bundle.zip> | iif <file> (v1) | ofx --account <code-or-id> <file>
 export       --format <interchange|csv> --out <path>
 verify       [<file>] [--full]
@@ -434,4 +436,4 @@ token        create --user <username> --name <n> --actor <api|agent> --scopes <l
 | Actor | Local commands act as the system file's desktop principal (`via = cli`). Remote commands act as the token's principal. |
 | Output | `table` for humans (default on a TTY), `json` (the HTTP DTOs) and `csv` (reports and lists). |
 | Exit codes | 0 success; 1 unexpected error; 2 usage error; 3 domain validation (422-class); 4 conflict or locked (409, 412, `store.company_locked`); 5 not found; 6 permission denied |
-| Secrets | Never accepted as plain flags. Passwords are prompted, tokens come from `--token-file` or `BOOKSCRAFT_TOKEN`. |
+| Secrets | Never accepted as plain flags. Passwords are prompted. The BooksCraft API token for `--server` comes from `--token-file` or `BOOKSCRAFT_TOKEN`; QBO OAuth tokens come from the `--qbo-tokens` file. |

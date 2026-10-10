@@ -51,7 +51,7 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 | `crates/cli` | AGPL | no | `bookscraft` binary: `serve`, `mcp`, `company`, `import`, `export`, `verify`, `backup`, `user`, `token`, `report` | app, api, mcp, platform | W4-02 |
 | `crates/test-support` | AGPL | n/a | Builders, fixtures, golden helpers, proptest strategies, audit assertions (dev-only) | domain, store, ledger, posting, money | W0-03 |
 | `tests/scenarios` | AGPL | n/a | Scenario spine (package `bookscraft-scenarios`) | test-support, app, domain | W0-03 |
-| `tests/e2e` | AGPL | n/a | End-to-end tests: API over HTTP against `bookscraft serve`; desktop through `tauri-driver` and WebKitWebDriver on Linux CI (package `bookscraft-e2e`) | app, api-types | W0-01 (stub), W5-04 |
+| `tests/e2e` | AGPL | n/a | End-to-end tests (package `bookscraft-e2e`): the web UI through WebDriver (`fantoccini` with WebKitWebDriver) against an in-process server; the API over HTTP; the desktop app through `tauri-driver` on Linux. Processes (drivers, Xvfb) are started by `cargo xtask e2e`, never by the tests (D-5) | app, api, api-types | W0-01 (stub), W2-05 (web harness), W5-04 (desktop, API, pilot) |
 | `xtask` | AGPL | n/a | Build automation (`cargo xtask`); no workspace deps | — | W0-01 |
 | `spikes/ui` | AGPL | n/a | UI spike, its own Cargo workspace, excluded from the root workspace (not a member) | — | W0-06 |
 
@@ -355,7 +355,7 @@ flowchart LR
 | Error codes | Constants in the owning crate; the string namespace matches the crate (store owns the trigger codes in schema.sql) | `cargo xtask lint` fails on duplicate code strings; `cargo xtask docs` regenerates the API.md code table in the Weave |
 | Migrations | `crates/store/migrations/NNNN_<slug>.sql` | Only a Weave adds one (CCR) |
 | Workspace manifest and lockfile | Root `Cargo.toml`, `Cargo.lock`, every `crates/*/Cargo.toml` | Only W0-01 and Weaves edit them; CI builds with `--locked` |
-| xtask subcommands | Pre-registered in W0-01 (`doctor`, `lint`, `scope`, `ci`, `spine`, `hook`, `warm`, `ui`, `package`, `docs`, `dco`) | Later WPs fill a pre-registered module only if their prompt says so |
+| xtask subcommands | Pre-registered in W0-01 (`doctor`, `lint`, `scope`, `ci`, `spine`, `hook`, `warm`, `ui`, `e2e`, `package`, `docs`, `dco`), one module file each | Later WPs fill a pre-registered module only if their OWNERSHIP row lists it (`ui.rs` and `e2e.rs`: W2-05; `package.rs`: W5-01; `e2e.rs`: W5-04) |
 
 Full rules: [OWNERSHIP.md](../coordination/OWNERSHIP.md) and [PARALLEL_DEV_PLAYBOOK.md](../process/PARALLEL_DEV_PLAYBOOK.md).
 
@@ -448,6 +448,7 @@ Rules:
 | Accessibility | Semantic HTML, labelled inputs, ARIA roles for grids and dialogs, live region for toasts, 4.5:1 contrast; verified with Orca (GNOME) in the spike and in UI acceptance tests |
 | Print and PDF | Previews are SVG pages rendered by `render` (Typst); Print uses the webview print dialog on a print stylesheet; Save as PDF downloads the Typst PDF |
 | Routes | Pre-registered in W2-05 (section 10.2) |
+| Testing | View-model logic (formatting, validation, keyboard maps, state transitions) lives in plain Rust modules tested natively with `cargo test -p bookscraft-ui`. Each page work package owns one end-to-end file `tests/e2e/tests/ui_<area>.rs` that drives the web build by keyboard through WebDriver (`fantoccini` with WebKitWebDriver, the same engine as the Linux desktop), started by `cargo xtask e2e --web`. Screen-reader and GPU checks are done by the owner on Fedora. |
 
 ### 10.1 Keyboard shortcuts
 
@@ -528,6 +529,7 @@ BooksCraft writes its own labels and help text. "QuickBooks" appears only in fac
 | `cargo xtask hook <fmt\|stop\|guard>` | Claude Code hooks (`.claude/settings.json`) |
 | `cargo xtask warm` | `cargo fetch` plus a check of the light crates; used by the SessionStart hook |
 | `cargo xtask ui <build\|serve>` | Builds the WASM UI; serves it with a dev server that proxies `/api` to a running `bookscraft serve` |
+| `cargo xtask e2e [--web\|--desktop]` | Builds the UI, starts WebKitWebDriver (or `tauri-driver`) and Xvfb when needed, then runs `cargo test --locked -p bookscraft-e2e`; CI job `e2e (ubuntu-latest)`, not a required check until Weave 5 decides |
 | `cargo xtask package <appimage\|deb\|rpm\|flatpak\|msi\|dmg>` | Packaging (W5-01) |
 | `cargo xtask docs` | Regenerates `docs/architecture/openapi.json` and the error-code table |
 | `cargo xtask dco --pr-body <file>` | Checks the PR description carries a valid `Signed-off-by:` line |
