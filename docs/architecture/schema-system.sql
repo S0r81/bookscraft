@@ -27,6 +27,7 @@ CREATE TABLE user (
     password_hash  TEXT,                                                    -- argon2id PHC string
     oidc_issuer    TEXT,
     oidc_subject   TEXT,
+    is_admin       INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0, 1)),  -- installation admin: users, companies
     is_disabled    INTEGER NOT NULL DEFAULT 0 CHECK (is_disabled IN (0, 1)),
     version        INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
     created_at     TEXT NOT NULL CHECK (created_at GLOB '????-??-??T??:??:??.???Z'),

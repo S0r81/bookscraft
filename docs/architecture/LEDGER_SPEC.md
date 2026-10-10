@@ -567,11 +567,11 @@ The scenario spine is a QA-owned end-to-end suite in `tests/scenarios/` (ADR-002
 | S10 | 2026-03-09 | SR-01 Tallgrass Outfitters, "Logo refresh" 1,200.00 (Design Income), paid by check to Undeposited Funds | `SalesReceipts` |
 | S11 | 2026-03-10 | DEP-01 to Checking: PMT-01 + SR-01 = 4,200.00 | `Deposits` |
 | S12 | 2026-03-12 | EXP-01 Fernwood Office Supply on Studio Visa, Office Supplies 186.40 | `Expenses` |
-| S13 | 2026-03-12 | Edit EXP-01 to 168.40 (typo). Expect three entries for EXP-01: original 186.40, reversal, revision 2 at 168.40 | `Expenses`, `Edits` |
+| S13 | 2026-03-12 | Edit EXP-01 to 168.40 (typo). Expect three entries for EXP-01: original 186.40, reversal, revision 2 at 168.40 | `Expenses` |
 | S14 | 2026-03-13 | PMT-02 Juniper Lane Bakery, 2,500.00 deposited directly to Checking, applied to INV-1002 (partial) | `CustomerPayments` |
 | S15 | 2026-03-16 | INV-1003 Tallgrass Outfitters, "Website build" 6,000.00, class Web, project Tallgrass website, terms Net 15 (due 2026-03-31) | `Invoices`, `Dimensions` |
 | S16 | 2026-03-18 | CM-01 Tallgrass Outfitters, "Website build" credit 500.00, applied now to INV-1003 | `CreditMemos` |
-| S17 | 2026-03-19 | INV-1004 Tallgrass Outfitters 250.00 entered in error, then voided the same day | `Invoices`, `Voids` |
+| S17 | 2026-03-19 | INV-1004 Tallgrass Outfitters 250.00 entered in error, then voided the same day | `Invoices` |
 | S18 | 2026-03-20 | VC-01 Cobaltline Hosting, Hosting credit 40.00 | `VendorCredits` |
 | S19 | 2026-03-20 | BP-02 Cobaltline Hosting: check 1042 from Checking 200.00 plus VC-01 40.00, both applied to BILL-2001 | `BillPayments` |
 | S20 | 2026-03-23 | PMT-03 Tallgrass Outfitters 6,000.00 to Undeposited Funds: 5,500.00 applied to INV-1003, 500.00 unapplied | `CustomerPayments` |
@@ -582,7 +582,7 @@ The scenario spine is a QA-owned end-to-end suite in `tests/scenarios/` (ADR-002
 | S25 | 2026-03-27 | EXP-02 Ampersand Freelance Studio, check 1044 from Checking, Contract Labor 1,500.00 | `Expenses` |
 | S26 | 2026-03-30 | JE-01 Depreciation 100.00 Dr / Accumulated Depreciation 100.00 Cr | `JournalEntries` |
 | S27 | 2026-03-31 | Import an OFX statement for Checking with 9 lines (below). Import it again: 0 new lines | `BankImport` |
-| S28 | 2026-03-31 | Match the 8 known lines. For the 15.00 bank fee, an `agent` actor creates draft EXP-03 (Bank Fees 15.00 from Checking). Agent post attempt → 403 `auth.agent_forbidden`. TB unchanged while it is a draft. Owner approves → posted; audit shows `approval.approve` by the owner. Match the fee line to EXP-03 | `BankReview`, `Approvals` |
+| S28 | 2026-03-31 | Match the 8 known lines. For the 15.00 bank fee, an `agent` actor creates draft EXP-03 (Bank Fees 15.00 from Checking). Agent post attempt → 403 `auth.agent_forbidden`. TB unchanged while it is a draft. Owner approves → posted; audit shows `approval.approve` by the owner. Match the fee line to EXP-03 | `BankReview`, `Expenses`, `Approvals` |
 | S29 | 2026-03-31 | Reconcile Checking: statement ending 17,835.00, tick the 9 lines, difference 0.00, complete. EXP-02 stays outstanding | `Reconciliation` |
 | S30 | | Set `hard_locked_through = 2026-02-28`, `soft_locked_through = 2026-03-31`. Posting a JE dated 2026-03-15 without an override → `period.soft_locked`; with an override reason → posts (then void it with an override). A JE dated 2026-02-27 with an override → `period.hard_locked` | `PeriodLocks` |
 | S31 | | Run every report below and compare with the golden files; run `verify` → chain intact | `Reports`, `Verify` |
