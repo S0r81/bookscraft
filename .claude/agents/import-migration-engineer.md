@@ -1,6 +1,6 @@
 ---
 name: import-migration-engineer
-description: BooksCraft import and migration engineer. Use for the interchange, OFX and IIF libraries, the QBO mapper and connector, and the migration pipeline with parity validation, rollback and export - work packages W1-04, W3-03, W3-04 and W4-03.
+description: BooksCraft import and migration engineer. Use for the interchange and OFX libraries (the IIF library is a stub until v1), the QBO mapper and connector, and the migration pipeline with parity validation, rollback and export - work packages W1-04, W3-03, W3-04 and W4-03.
 model: inherit
 isolation: worktree
 color: yellow

@@ -156,7 +156,7 @@ Cold Rust builds take longer than the default two-minute command timeout.
 
 `.claude/settings.json` runs `.claude/hooks/session-start.sh` on every start and resume, locally and in the cloud. It installs rustup if a cloud VM lacks it, installs the toolchain named in `rust-toolchain.toml`, runs `cargo xtask doctor --fix`, and warms the build cache in the background. Before W0-01 merges, it only reports that the toolchain file does not exist yet.
 
-Other repository hooks: a guard that refuses edits outside the work package's owned paths on `wp/*` branches, `rustfmt` on every edited `.rs` file, and a fast `cargo check` of the changed crates at the end of every turn (the Stop event), skipped at once when nothing changed since the last passing check.
+Other repository hooks: a guard that refuses edits outside the work package's owned paths on `wp/*` branches, `rustfmt` on every edited `.rs` file, and, at the end of every turn (the Stop event), a push check for unpushed commits followed by a fast `cargo check` of the changed crates; only the `cargo check` is skipped when nothing changed since the last passing check.
 
 ### 2.5 GitHub from a cloud session
 
