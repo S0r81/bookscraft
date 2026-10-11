@@ -73,7 +73,7 @@ Out: report and statement PDFs (report screens print through the webview, ARCHIT
 | AC-3 | Previews are stable | insta snapshots of the SVG pages for INV-1002, an estimate and a credit memo |
 | AC-4 | Email jobs work | tests with lettre's stub transport: the message has the PDF attachment and the right recipients; `last_sent_at` is set and audited; an SMTP failure returns `render.smtp_failed` and leaves the job for retry |
 | AC-5 | Only posted documents are sent | tests: `send` on a draft and on a voided document returns `render.not_sendable` and enqueues nothing |
-| AC-6 | Secrets stay secret | test: the SMTP password never appears in logs, the job record or error output |
+| AC-6 | Secrets stay secret | test: the SMTP password never appears in logs, the job record or error output; `email.get` never returns it; `email.set` without `password` keeps the stored secret and with `"password": ""` deletes it (API.md §5.1) |
 | AC-7 | Routes behave per API.md | contract tests: `application/pdf` content type, preview JSON with SVG pages, `send` returns 202 with a job, an agent may read PDFs but not send |
 | AC-8 | Fonts are licensed for redistribution | every font file in the crate has its license text beside it, or fonts come from `typst-kit` (stated in the PR) |
 | AC-9 | Lints pass and only owned paths changed | `cargo xtask lint` and `cargo xtask scope W4-04` exit 0 |

@@ -43,7 +43,7 @@ In:
 - **Documents:** save draft, update draft, post (`post = true` or the generic post), repost a posted document, void; amounts computed at save with `money::calc` and `books::tax` and stored (LEDGER_SPEC §4.1); number sequences; `posting::post` then `store::ledger::post_revision` in one transaction with the audit event.
 - **Estimates:** statuses (pending, accepted, closed, rejected); convert to a draft invoice with a `document_link (converted_from)`.
 - **Customer payments:** applications to charges, credits applied in the same event, the unapplied remainder as open credit, zero-amount payments that only apply credits (no journal entry), the bounds rule (`sales.application_exceeds_open`), the same-key rule (`sales.application_mismatch`), and the warning `sales.payment_before_charge`.
-- **Credit memos** with "apply now"; **refund receipts**; **customer refunds** settling open credits (refund not above the open credit).
+- **Credit memos** with "apply now"; **refund receipts**; **customer refunds** settling open credits (the refund's amount is the sum of its applications, each within that credit's open amount).
 - **Edits and voids:** a repost must keep every open amount at zero or more (`sales.applied_amount_exceeds_total`); voiding a document that other documents settled fails with `document.has_active_settlements`; voiding an event document reopens what it settled.
 - **Open items** per customer (LEDGER_SPEC §5 rule 2), serving `GET /contacts/{id}/open-items?ledger=ar`.
 - **Agent rule:** agents may create drafts of estimates, invoices, sales receipts and credit memos only; posting goes through approval (`books` helper).
@@ -77,7 +77,7 @@ Out: printing and email (W4-04), UI (W3-01), deposits (W2-03), reports (W2-04).
 | Id | Criterion | How it is checked |
 |---|---|---|
 | AC-1 | INV-1002 saved through the service stores subtotal 5,300.00, discount 265.00, tax lines 47.50 and 15.20 on a 760.00 base, total 5,097.70, and posts the §4.1 entry | service test |
-| AC-2 | Settlements follow LEDGER_SPEC §5 | tests: partial payment (PMT-02 leaves 2,597.70 open on INV-1002); over-application refused with `sales.application_exceeds_open`; another customer's invoice refused with `sales.application_mismatch`; PMT-03 leaves 500.00 unapplied; REF-01 refunds it |
+| AC-2 | Settlements follow LEDGER_SPEC §5 | tests: partial payment (PMT-02 leaves 2,597.70 open on INV-1002); over-application refused with `sales.application_exceeds_open`; another customer's invoice refused with `sales.application_mismatch`; PMT-03 leaves 500.00 unapplied; REF-01 refunds it, and its amount is derived from its applications (a refund applying 300.00 and 200.00 posts 500.00 to AR and to the bank) |
 | AC-3 | T-SALES-1 and T-SALES-2 | tests |
 | AC-4 | T-SALES-3: locks cover zero-amount payments | tests: a zero-amount payment applying a credit, dated on or before the hard-lock date, fails with `period.hard_locked` (post and void); dated in a soft-locked period, it fails with `period.soft_locked` for a bookkeeper and succeeds for an accountant with a reason, appending `period.override` |
 | AC-5 | Edit and void rules | tests: reposting an invoice below its applied amount fails with `sales.applied_amount_exceeds_total`; voiding a paid invoice fails with `document.has_active_settlements`; voiding the payment reopens the invoice |

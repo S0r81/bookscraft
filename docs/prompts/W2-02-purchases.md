@@ -41,7 +41,7 @@ In:
 
 - **Documents:** bills, bill payments (by check from a bank account, or from a credit card; check number in `reference_number`), vendor credits, expenses (cash, check or card; AR or AP lines allowed with a line contact), card credits, vendor refunds; save, update, post, repost and void through `posting::post` and `store::ledger::post_revision`, with number sequences and audit.
 - **Bill payments:** applications to bills, vendor credits applied in the same event, unapplied remainder, zero-amount payments that only apply credits, `purchases.application_exceeds_open`, `purchases.application_mismatch`.
-- **Vendor refunds** against open vendor credits.
+- **Vendor refunds** against open vendor credits; the refund's amount is the sum of its applications (LEDGER_SPEC §4.13).
 - **Edit and void rules** as in sales: open amounts stay at zero or more; `document.has_active_settlements` when others settled the document.
 - **Open items** per vendor, serving `GET /contacts/{id}/open-items?ledger=ap`.
 - **Agent rule:** agents may create drafts of bills, vendor credits, expenses and card credits only (API.md §5.4); bill payments and vendor refunds never.
@@ -74,7 +74,7 @@ Out: purchase orders (later), bill pay or any money movement (I-11), UI (W3-02).
 |---|---|---|
 | AC-1 | BP-02 applies a 200.00 check and VC-01's 40.00 to BILL-2001 (240.00), leaving it fully paid, and posts AP 200.00 Dr / Checking 200.00 Cr | service test |
 | AC-2 | The EXP-01 typo fix (spine S13) leaves three entries: original 186.40, its reversal, revision 2 at 168.40 | service test |
-| AC-3 | Settlement rules | tests: over-application refused with `purchases.application_exceeds_open`; another vendor's bill refused with `purchases.application_mismatch`; a zero-amount payment applying a vendor credit writes no journal entry |
+| AC-3 | Settlement rules | tests: over-application refused with `purchases.application_exceeds_open`; another vendor's bill refused with `purchases.application_mismatch`; a zero-amount payment applying a vendor credit writes no journal entry; a vendor refund applying 60.00 and 40.00 to two vendor credits posts 100.00 to the money account and AP |
 | AC-4 | An expense line to AP without a contact is refused | test |
 | AC-5 | T-PURCH-1: locks cover zero-amount payments | tests: a zero-amount bill payment applying a vendor credit, dated on or before the hard-lock date, fails with `period.hard_locked` (post and void); dated in a soft-locked period, it fails with `period.soft_locked` for a bookkeeper and succeeds for an accountant with a reason, appending `period.override` |
 | AC-6 | Agent rule | tests: an agent creates a draft expense (as in S28); its post fails with `auth.agent_forbidden`; creating a bill payment fails with `auth.agent_forbidden`; the owner approves the draft |

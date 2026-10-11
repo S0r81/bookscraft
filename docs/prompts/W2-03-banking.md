@@ -80,7 +80,7 @@ Tests build deposit sources (customer payments, sales receipts, vendor refunds a
 | AC-3 | T-BANK-3 (L-3): completing needs a zero difference, and the stored `snapshot_hash` recomputes from the frozen lines | tests |
 | AC-4 | T-BANK-4 (L-4): reposting a document whose reconciled money line changes is refused with `reconciliation.reconciled_line_changed`; after unreconciling that line with a reason, the repost succeeds and the old reconciliation shows as discrepant | tests |
 | AC-5 | The S29 numbers reproduce | test builds Checking's opening balance and March activity from journal entries and transfers with the Appendix A amounts (sales and purchases documents are not available to this WP), imports the spine statement, matches the nine lines and reconciles: beginning 12,500.00, cleared 5,335.00, ending 17,835.00, difference 0.00, and a 1,500.00 payment (check 1044) left outstanding |
-| AC-6 | Review actions | tests: suggestion ranking; match; add (posted for a user who may post, a draft for an agent and for a user who may not); exclude; undo of an add voids the document; each action in `bank_txn_action` |
+| AC-6 | Review actions | tests: suggestion ranking; match; add (posted for a user, a draft for an agent and for an `api` token with only `drafts:write`); exclude; undo of an add voids the document; each action in `bank_txn_action` |
 | AC-7 | Rules | tests: priority order and first match; an `auto_add` rule adds as its author with `via = job`; preview lists the matching lines |
 | AC-8 | T-AUDIT-1 | `assert_audited` in each mutating command's test |
 | AC-9 | Routes behave per API.md | contract tests per endpoint |

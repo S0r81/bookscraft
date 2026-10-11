@@ -61,7 +61,7 @@ Tests build their data through `books` (journal entries, opening balances) and, 
 
 | Invariant | Test |
 |---|---|
-| I-4 | T-REP-1: no table or column stores cash-basis amounts (schema scan); the cash-basis trial balance balances as of every date, including between settlements; a fully settled document recognizes exactly its accrual amounts (proptest whose generator includes mixed AR/AP and `W = 0` documents) |
+| I-4 | T-REP-1: no table or column stores cash-basis amounts (schema scan); the cash-basis trial balance balances as of every date, including between settlements; a fully settled document recognizes exactly its accrual amounts (proptest whose generator includes mixed AR/AP documents, `W = 0` documents and documents whose AR/AP postings net to zero per contact) |
 | I-3 | the balance sheet check `assets = liabilities + equity` runs on every report (tests on random ledgers) |
 
 ## Acceptance criteria
@@ -70,7 +70,7 @@ Tests build their data through `books` (journal entries, opening balances) and, 
 |---|---|---|
 | AC-1 | T-REP-1 | schema scan test plus a proptest of random documents and settlements (1,000 cases) |
 | AC-2 | Cash recognition reproduces the LEDGER_SPEC §7 example | test: INV-1002 (5,097.70) with a 2,500.00 settlement on 2026-03-13 recognizes Design Income 2,206.88, Print Sales 392.33, Discounts Given (129.96), state tax 23.30 and city tax 7.45 |
-| AC-3 | Mixed AR/AP documents recognize exactly once | test: a journal entry Dr AR (customer) 100.00 / Cr Income 60.00 / Cr AP (vendor) 40.00, settled 100.00 on the AR side and then 40.00 on the AP side, recognizes 60.00 of income in total and leaves the cash-basis balance sheet balanced on both dates; a journal entry Dr AR (customer) 100.00 / Cr AP (vendor) 100.00 (`W = 0`), settled 100.00 on the AR side and on a later date 100.00 on the AP side, shows 100.00 on the Offsetting AR/AP documents line between the two dates and 0.00 after, with the balance sheet balanced on every date |
+| AC-3 | Mixed AR/AP documents recognize exactly once | test: a journal entry Dr AR (customer) 100.00 / Cr Income 60.00 / Cr AP (vendor) 40.00, settled 100.00 on the AR side and then 40.00 on the AP side, recognizes 60.00 of income in total and leaves the cash-basis balance sheet balanced on both dates; a journal entry Dr AR (customer) 100.00 / Cr AP (vendor) 100.00 (`W = 0`), settled 100.00 on the AR side and on a later date 100.00 on the AP side, shows 100.00 on the Offsetting AR/AP documents line between the two dates and 0.00 after, with the balance sheet balanced on every date; a journal entry Dr AR (customer) 100.00 / Cr AR (same customer) 100.00 / Dr Checking 50.00 / Cr Income 50.00 is a cash document and recognizes 50.00 of income on its date |
 | AC-4 | Retained earnings are computed, never posted | test: income in a prior fiscal year appears as Retained Earnings on the balance sheet and is folded in the trial balance; no journal entry is written |
 | AC-5 | Aging buckets and credits follow §12 | tests at bucket boundaries (0, 1, 30, 31, 60, 61, 90, 91 days) and a credit shown negative by document date |
 | AC-6 | Sales tax liability follows §12 | test: invoice tax and a credit memo's negative tax by agency, and a payment as a debit to the liability account |

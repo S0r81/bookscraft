@@ -19,7 +19,7 @@ You build the BooksCraft user interface: one Leptos client-side app compiled to 
 
 - **Dependencies:** `ui` uses only `api-types`, `money` and UI or WASM crates (D-3). It never uses `domain`, `store` or services.
 - **No JavaScript, no Node:** Rust plus one `crates/ui/index.html` host page and hand-written CSS. Build with `cargo xtask ui build` (no Trunk, no npm). `wasm-bindgen`'s generated glue lives only in `target/`.
-- **API client:** relative URLs (`/api/v1/...`) so the same bundle works in the desktop webview and in browsers; send `Idempotency-Key` on creates and `If-Match` on updates; show problem-details field errors next to their fields; a 412 shows a reload prompt.
+- **API client:** relative URLs (`/api/v1/...`) so the same bundle works in the desktop webview and in browsers; send `Idempotency-Key` on creates and `If-Match` on updates of versioned resources (not on API.md §2's unversioned ones); show problem-details field errors next to their fields; a 412 shows a reload prompt.
 - **Ownership:** `crates/ui/src/routes.rs` and `lib.rs` are registration points. A page work package fills only its own `crates/ui/src/pages/<area>/` directory and its own e2e test file. A missing shared component is a CCR; meanwhile build a local one inside your page directory.
 - **Keyboard-first:** every action reachable without a mouse; the shortcuts in ARCHITECTURE §10.1; visible focus; tab order follows reading order; grids move with arrow keys, `Home`, `End`, `PageUp`, `PageDown`.
 - **Accessibility:** semantic HTML, a label for every input, ARIA roles for grids and dialogs, a live region for toasts, 4.5:1 contrast. Owner checks with Orca on GNOME.

@@ -18,7 +18,7 @@ You build the edges of BooksCraft: how people, scripts and agents reach the core
 ## Rules
 
 - **Wire format:** JSON `snake_case`; unknown fields rejected; money as `{"amount": "<decimal>", "currency": "<ISO>"}` with exactly the currency's minor digits; dates `YYYY-MM-DD`; timestamps RFC 3339 UTC.
-- **Every state-changing POST** requires `Idempotency-Key`; updates and actions require `If-Match: W/"<version>"` (412 stale, 428 missing). Lists are cursor-paginated (max 500).
+- **Every state-changing POST** requires `Idempotency-Key`; updates and actions require `If-Match: W/"<version>"` (412 stale, 428 missing), except on API.md §2's unversioned resources. Lists are cursor-paginated (max 500).
 - **Errors** are RFC 9457 problem details with a stable `code`; never leak internals (500 says `api.internal` plus the request id).
 - **Authorization before work:** each handler checks `domain::auth::permits` for its permission before calling the service. Each OpenAPI operation declares `x-bookscraft-permission` and `x-bookscraft-agent` (true or false); T-API-1 calls every operation marked `x-bookscraft-agent: false` with an agent token and expects 403 `auth.agent_forbidden`.
 - **Services are synchronous:** call them inside `tokio::task::spawn_blocking`; never hold a database transaction across an `.await`.
@@ -30,7 +30,7 @@ You build the edges of BooksCraft: how people, scripts and agents reach the core
 
 ## Tests you always write
 
-- Contract tests per endpoint: success, validation (`validation.*`), permission (403), idempotent replay, key reuse (422), stale `If-Match` (412), missing `If-Match` (428).
+- Contract tests per endpoint: success, validation (`validation.*`), permission (403), idempotent replay, key reuse (422), stale `If-Match` (412), missing `If-Match` (428) on versioned resources.
 - The OpenAPI document regenerated with `cargo xtask docs` and committed when you own `docs/architecture/openapi.json`; CI fails on drift.
 - CLI: exit codes 0–6 as in API.md §9.
 
