@@ -19,7 +19,7 @@ Every prompt has exactly these sections, in this order:
 11. **Deliverables**: branch and PR title.
 12. **Stop conditions**: always including "needing to touch an unowned path means raise a CCR and stop that line of work".
 
-A merged WP is recognized by its squash commit title on `main`, which starts with `<WP>: `. Only the Weave pull request that closes wave `n` is titled `Weave <n>: …`; any other Weave pull request in that wave (a contract PR for blocking CCRs, or an interim Wave 0 merge) is titled `Weave <n> (interim): …`. Preconditions use these titles: `git log origin/main --format=%s | grep -q '^W0-02: '`, or `grep -q '^Weave 1: '` for a closed wave.
+A merged WP is recognized by its squash commit title on `main`, which starts with `<WP>: `. Only the Weave pull request that closes wave `n` is titled `Weave <n>: …`; any other Weave pull request in that wave (a contract PR for blocking CCRs, or an interim Wave 0 merge) is titled `Weave <n> (interim): …`. The one exception is W5-W Part B, merged after the wave is closed, titled `Weave 5 (release): v0.1.0`. Neither form matches `^Weave <n>: `. Preconditions use these titles: `git log origin/main --format=%s | grep -q '^W0-02: '`, or `grep -q '^Weave 1: '` for a closed wave.
 
 ## All prompts
 

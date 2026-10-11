@@ -72,7 +72,7 @@ Out: sales, purchases, banking, reports, imports, render and feeds routes (their
 | AC-2 | T-API-2 | test fails if any operation lacks `x-bookscraft-permission` or `x-bookscraft-agent` |
 | AC-3 | T-SCOPE-1 | test over the OpenAPI paths and operation ids, matching whole words only (so `attachments` does not match `ach`) |
 | AC-4 | Idempotency follows API.md §2 | contract tests: replay with `Idempotent-Replayed: true`; key reuse 422; in progress 409; missing key 400 |
-| AC-5 | Optimistic concurrency | contract tests: stale `If-Match` 412; missing 428; a successful update returns the new `ETag` |
+| AC-5 | Optimistic concurrency | contract tests: stale `If-Match` 412; missing 428; a successful update returns the new `ETag`; an unversioned resource of API.md §2 (`PUT /…/members/{uid}`) succeeds without `If-Match` and returns no `ETag` |
 | AC-6 | Errors are problem details | tests: a domain error, a validation error with field errors, an unknown field, a bad money string, an oversized body (413), and an unexpected error (500 `api.internal` with the request id, no internal detail) |
 | AC-7 | Authentication and CSRF | tests: no credentials 401 `auth.required`; cookie mutation without `X-BooksCraft-Client` refused; bearer mutation accepted without it; desktop mode resolves the desktop principal |
 | AC-8 | Every implemented endpoint has contract tests | each route file has tests for success, validation, permission (a viewer gets 403 on writes) and, for creates, idempotent replay |

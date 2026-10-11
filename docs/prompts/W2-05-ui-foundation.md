@@ -45,11 +45,11 @@ In:
 - **API client:** relative `/api/v1` URLs over `gloo-net`, typed with `api-types`; `Idempotency-Key` on creates; `If-Match` on updates; problem details turned into field errors; a 412 shows a reload prompt; session login in server mode, the desktop principal otherwise.
 - **Shell:** navigation, company switcher, command palette (`Ctrl+K`), and the shortcuts of ARCHITECTURE §10.1; visible focus; toasts in a live region.
 - **Components:** `DataTable` (virtualized rows, keyboard cell navigation, sortable columns), `MoneyInput` (decimal strings, never floats), `DateInput`, `ComboBox` (type-ahead), `LineItemsGrid` (live totals with `money::calc`), `Dialog`, `Toast`, `FormField` (label, description, error), `PrintPreview` (shows SVG pages from an API response).
-- **Screens:** `pages/home` (home with to-do counts, approvals list), `pages/books` (contacts, items, accounts, journal entries, opening balances), `pages/settings` (company, users, tokens, taxes, terms, payment methods, email; dimensions and custom fields read-only, since their management UI is v1), `pages/session` (login, company list and creation).
+- **Screens:** `pages/home` (home with to-do counts, approvals list), `pages/books` (contacts, items, accounts, journal entries, opening balances), `pages/settings` (company, users, tokens, taxes, terms, payment methods; dimensions and custom fields read-only, since their management UI is v1; and, because the email settings API arrives with W4-04, a placeholder page in `pages/settings/email.rs` whose component `routes.rs` names and W5-03 later fills with the form, keeping that name), `pages/session` (login, company list and creation).
 - **End-to-end harness:** `cargo xtask e2e --web` builds the UI, starts WebKitWebDriver (and Xvfb when there is no display), then runs `cargo test --locked -p bookscraft-e2e`; the harness in `tests/e2e/src/` starts an in-process server (router plus `app::compose` on a temporary company), connects `fantoccini` to the driver URL that `xtask` passes in `BOOKSCRAFT_WEBDRIVER_URL` (without it, the harness fails with "run through cargo xtask e2e"), and offers keyboard helpers. The test process starts no processes itself (D-5). The normal test run excludes this crate (`cargo xtask ci`).
 - **`tests/e2e/tests/ui_foundation.rs`:** by keyboard only, create a company, then a customer and an account, and find them through the command palette.
 
-Out: sales, purchases, banking, reports, close, audit and migration screens (Waves 3–4), printing and email actions (W5-03), desktop shell (W3-05).
+Out: sales, purchases, banking, reports, close, audit and migration screens (Waves 3–4), printing, email actions and the email settings form (W5-03), desktop shell (W3-05).
 
 ## Tasks
 

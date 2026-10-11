@@ -41,7 +41,7 @@ In:
 
 - **Engine:** queries over `ledger_line`, `active_settlement` and the document tables only; nothing derived is stored. Group by account, month or dimension value; dimension filters (`dim[<id>]=<value>`); comparison columns (previous period, previous year).
 - **Accrual reports:** trial balance as of a date (prior fiscal years' income and expense folded into Retained Earnings); profit and loss for a range; balance sheet as of a date with Retained Earnings and Net income computed and `assets = liabilities + equity` asserted on every run; general ledger with running balances; journal grouped by document (voided documents shown with their reversal); AR and AP aging (current, 1–30, 31–60, 61–90, 91+ by due date; credits negative by document date; summary and detail); sales tax liability by agency (base and tax from `document_tax_line`, payments as debits to the liability account, balance from the ledger); audit log query with filters.
-- **Cash basis** (LEDGER_SPEC §7): classify documents; recognize accrual documents through their active settlements with cumulative allocation of the signed running total; the unapplied customer and vendor payment lines; cash-basis versions of the trial balance, profit and loss, balance sheet, general ledger and sales tax liability (the journal and the agings have no basis).
+- **Cash basis** (LEDGER_SPEC §7): classify documents; recognize accrual documents through their active settlements with cumulative allocation of the signed running total; offsetting documents (`W = 0`) and their report line; the unapplied customer and vendor payment lines; cash-basis versions of the trial balance, profit and loss, balance sheet, general ledger and sales tax liability (the journal and the agings have no basis).
 - **CSV** for every report.
 - **Routes:** every path in API.md §5.6 with `basis`, dimension filters, `Accept: text/csv`; permission `reports.read` (`audit.read` for audit events); agents may read reports with `reports:read` but never audit events.
 - **Capability:** `Reports` when complete and tested.
@@ -61,7 +61,7 @@ Tests build their data through `books` (journal entries, opening balances) and, 
 
 | Invariant | Test |
 |---|---|
-| I-4 | T-REP-1: no table or column stores cash-basis amounts (schema scan); the cash-basis trial balance balances; a fully settled document recognizes exactly its accrual amounts (proptest) |
+| I-4 | T-REP-1: no table or column stores cash-basis amounts (schema scan); the cash-basis trial balance balances as of every date, including between settlements; a fully settled document recognizes exactly its accrual amounts (proptest whose generator includes mixed AR/AP and `W = 0` documents) |
 | I-3 | the balance sheet check `assets = liabilities + equity` runs on every report (tests on random ledgers) |
 
 ## Acceptance criteria
@@ -70,7 +70,7 @@ Tests build their data through `books` (journal entries, opening balances) and, 
 |---|---|---|
 | AC-1 | T-REP-1 | schema scan test plus a proptest of random documents and settlements (1,000 cases) |
 | AC-2 | Cash recognition reproduces the LEDGER_SPEC §7 example | test: INV-1002 (5,097.70) with a 2,500.00 settlement on 2026-03-13 recognizes Design Income 2,206.88, Print Sales 392.33, Discounts Given (129.96), state tax 23.30 and city tax 7.45 |
-| AC-3 | Mixed AR/AP documents recognize exactly once | test: a journal entry Dr AR (customer) 100.00 / Cr Income 60.00 / Cr AP (vendor) 40.00, settled 100.00 on the AR side and then 40.00 on the AP side, recognizes 60.00 of income in total and leaves the cash-basis balance sheet balanced on both dates |
+| AC-3 | Mixed AR/AP documents recognize exactly once | test: a journal entry Dr AR (customer) 100.00 / Cr Income 60.00 / Cr AP (vendor) 40.00, settled 100.00 on the AR side and then 40.00 on the AP side, recognizes 60.00 of income in total and leaves the cash-basis balance sheet balanced on both dates; a journal entry Dr AR (customer) 100.00 / Cr AP (vendor) 100.00 (`W = 0`), settled 100.00 on the AR side and on a later date 100.00 on the AP side, shows 100.00 on the Offsetting AR/AP documents line between the two dates and 0.00 after, with the balance sheet balanced on every date |
 | AC-4 | Retained earnings are computed, never posted | test: income in a prior fiscal year appears as Retained Earnings on the balance sheet and is folded in the trial balance; no journal entry is written |
 | AC-5 | Aging buckets and credits follow §12 | tests at bucket boundaries (0, 1, 30, 31, 60, 61, 90, 91 days) and a credit shown negative by document date |
 | AC-6 | Sales tax liability follows §12 | test: invoice tax and a credit memo's negative tax by agency, and a payment as a debit to the liability account |

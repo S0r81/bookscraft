@@ -45,7 +45,7 @@ In:
 - **CSV and XLSX lists** (§7): accounts, contacts, items and an opening trial balance; a column-mapping structure (the CLI parses its TOML file; the UI saves mappings by name); UTF-8 and Windows-1252; row external ids from a key column or `sha256(file name ‖ row number ‖ row content)`.
 - **Rollback** (§10) in all three cases, never deleting a user file.
 - **Export** (§11): the zip bundle with `manifest.json` (per-file SHA-256), one JSON Lines file per entity, `csv/` copies and `attachments/`; CSV-only export.
-- **Routes:** `/imports` (start with multipart files, list, get, rollback), `/exports` (start, download), and the `qbo/connect`, `qbo/callback` and `qbo/token` routes calling `ImportService` (which answers `api.not_implemented` until W4-03).
+- **Routes:** `/imports` (start with multipart files, list, get, rollback), `/exports` (start, download), and the `qbo/connect`, `qbo/callback`, `qbo/estimate` and `qbo/token` routes calling `ImportService` (which answers `api.not_implemented` until W4-03).
 - **Capabilities:** `ImportCsv`, `ImportInterchange`, `Export` when complete (`ImportQbo` is W4-03; `ImportIif` is v1).
 
 Out: the QBO HTTP connector and token handling (W4-03), the migration wizard UI (W4-01), IIF import path (v1).
@@ -79,7 +79,7 @@ Out: the QBO HTTP connector and token handling (W4-03), the migration wizard UI 
 | AC-6 | Validation gates the run | test: an unresolvable trial balance difference without residuals fails with `import.parity_failed` listing account and month |
 | AC-7 | CSV and XLSX lists import with mappings, encodings and dedupe | tests: Windows-1252 file, debit and credit columns, a re-import skipping known rows, an opening trial balance that does not balance refused |
 | AC-8 | Export bundle is well formed | test: manifest counts and SHA-256 values match the files; the bundle validates with `interchange` |
-| AC-9 | Routes behave per API.md §5.7 | contract tests, including a QBO route answering 501 `api.not_implemented` |
+| AC-9 | Routes behave per API.md §5.7 | contract tests, including each of the four QBO routes mapping an `api.not_implemented` answer from a fake `ImportService` to 501 problem details (a fake, so the test survives W4-03) |
 | AC-10 | Archives are safe to read | test: a bundle with a `../` entry or an absolute path is refused |
 | AC-11 | No spine regression | `cargo xtask spine` prints `spine: 31 passed, 0 failed, 0 pending` |
 | AC-12 | Lints pass and only owned paths changed | `cargo xtask lint` and `cargo xtask scope W3-04` exit 0 |
