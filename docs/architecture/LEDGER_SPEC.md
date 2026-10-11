@@ -73,7 +73,7 @@ System accounts cannot be deleted. They can be renamed and archived only if they
 
 1. **Pure function.** `posting::post(document, revision, context) -> Result<Option<PostedEntry>, PostingError>` lives in the `posting` crate, which has no I/O (I-2). A `PostedEntry` is a `BalancedEntry` plus its `rules_version`. Its inputs are the document's revision snapshot (header, lines, tax lines, settlements) plus a read-only context of the referenced accounts, items, tax rates and agencies, all loaded by the caller. It returns `None` when the document has no ledger effect (estimates, zero-amount documents).
 2. **Versioned.** Each document type has its own rules version, for example `invoice@1`. The version is stored on every journal entry (`rules_version`). Changing a template means adding a new version; history is never re-posted under new rules unless the user edits the document (ADR-0008). Golden files exist per version.
-3. **Balanced by construction.** `ledger::BalancedEntry` can only be built through `BalancedEntry::new(date, lines)`, which rejects an empty or one-line entry, a line whose amount and base amount are both zero, a repeated line key, a non-zero base sum, and, when every line has the same currency, a non-zero transaction sum (I-3). The storage layer re-checks the same rules at finalize (`journal_entry_finalize` trigger).
+3. **Balanced by construction.** `ledger::BalancedEntry` can only be built through `BalancedEntry::new(date, lines)`, which rejects an empty or one-line entry, a line whose amount and base amount are both zero, a repeated line key, a non-zero base sum, and, when every line has the same currency, a non-zero transaction sum (I-3). The storage layer re-checks them in the posting constraints and at finalize (`journal_entry_finalize` trigger).
 4. **Entry date.** The entry date is the document date. A reversal takes the date of the entry it reverses (section 6).
 5. **Line keys.** Every posting carries a `line_key` that is stable across revisions of the same document:
 
@@ -124,8 +124,9 @@ Amounts are computed at entry time and stored on the document, then posted as st
 
 - Tax-inclusive base `G = S_tax − D_tax`; combined percentage `ρ = Σ rate_percent(r)`.
 - Net base `B = round_tax(G × 100 / (100 + ρ))`; tax total `t = G − B`.
-- Per rate, `t_r = allocate(t, [rate_percent(r) × 10,000 for each rate])` (section 7), so `Σt_r = t` exactly.
+- Per rate, `t_r = allocate(t, [rate_percent(r) × 10^f for each rate])` (section 7), where `f` is the largest number of fractional digits among the code's rates, so every weight is an integer and `Σt_r = t` exactly.
 - Per line, `document_line.tax_minor` = `tax_l = allocate(t, [a_l for each taxable line])`, so `Σtax_l = Σt_r`.
+- When `t = 0` (including a code whose rates are all 0 and taxable lines that net to zero, where the weights sum to zero), every `t_r` and every `tax_l` is 0 and `allocate` is not called.
 
 Posting 2..n credits `a_l − tax_l` instead of `a_l`. Postings 1, n+1 and n+2 are unchanged, and `T = Σa_l − D`.
 
@@ -277,7 +278,7 @@ Money received from a vendor for an open vendor credit. It raises AP, so it is t
 | 1 | `MONEY` (bank or undeposited funds) | | `R` | | `R > 0` | `{doc}:money` |
 | 2 | `AP` | vendor | | `R` | `R > 0` | `{doc}:ar` |
 
-Settlements: `(charge = this refund, credit = vendor credit_k, amount = R_k)`.
+Settlements: `(charge = this refund, credit = vendor credit_k, amount = R_k)` with `ΣR_k = R`. Validation: `R` ≤ the total open credit of the referenced vendor credits.
 
 ### 4.14 Deposit
 
@@ -337,7 +338,7 @@ An `opening_balance` document dated on the cut-over date. Its lines are account,
 | Topic | MVP rule |
 |---|---|
 | Rates | Manual: agencies, rates (percent) and tax codes, which are groups of rates. Automated rates sit behind `TaxRateProvider` (later). |
-| Computation | Section 4.1. Each rate is computed and rounded separately; rounding mode per section 8.1. |
+| Computation | Section 4.1. Exclusive mode computes and rounds each rate separately. Inclusive mode rounds the net base once and splits the tax total across rates and lines with `allocate`. Rounding mode per section 8.1. |
 | Liability | Each agency has its own `sales_tax_payable` account. Tax postings credit it on sales and debit it on credit memos and refund receipts. |
 | Payment | Recorded as an expense (or check) whose line debits the agency's liability account. A dedicated tax payment and filing record arrives in v1. |
 | Report | Sales tax liability by agency (section 12): taxable base and tax from `document_tax_line`, payments from debits to the liability account, balance from the ledger. |
@@ -408,14 +409,16 @@ cum_k = σ_1·s_1 + … + σ_k·s_k                                  (cum_0 = 0)
 recognized_k = allocate(−cum_k, w) − allocate(−cum_{k−1}, w)
 ```
 
-The result is recognized on `settled_on` of settlement `k`. When `X` is fully settled, `cum` equals the sum of `X`'s AR/AP postings, which is `−W`, so `X` recognizes exactly its accrual amounts and the cents never drift. Signing each settlement by its side keeps this true for a document with AR or AP postings in both directions, such as a journal entry with an AR line and an AP line. If `W = 0` (the recognizable postings net to zero), they are recognized in full on the date of `X`'s first active settlement.
+The result is recognized on `settled_on` of settlement `k`, and it totals `−σ_k·s_k`. When `X` is fully settled, `cum` equals the sum of `X`'s AR/AP postings, which is `−W`, so `X` recognizes exactly its accrual amounts and the cents never drift. Signing each settlement by its side keeps this true for a document with AR or AP postings in both directions, such as a journal entry with an AR line and an AP line.
+
+**Offsetting documents (`W = 0`).** When the recognizable postings net to zero, or there are none (a journal entry that moves a balance from one customer to another, or nets a customer's AR against the same party's AP), `allocate` is undefined. Such a document recognizes its recognizable postings in full on the date of its first active settlement, and each settlement `k` recognizes `−σ_k·s_k` on the report line **Offsetting AR/AP documents** (other income section, signed). The line carries only the part of the document settled on one side and not yet on the other. It returns to zero when the document is fully settled, because `cum` then equals `−W = 0`.
 
 Consequences:
 
 - An invoice settled by a credit memo recognizes both the invoice's income and the credit memo's contra-income on the application date. They net to the credited amount.
 - Credit card charges are cash documents, recognized when charged.
 - Sales tax on invoices is recognized in proportion to payments.
-- On a cash-basis balance sheet, AR and AP are zero. Accounts posted only by cash documents and by the money postings of cash settlement documents match accrual. Accounts that accrual documents post to follow recognition instead: sales tax payable, opening balance equity (through opening invoices and bills), and the money lines of journal entries or expenses with AR/AP lines. Equity includes cash-basis net income. The balance sheet balances because every recognized amount is half of a balanced pair: the money side was recognized at its date and the other side through settlements, or both sides at the same date.
+- On a cash-basis balance sheet, AR and AP are zero. Accounts posted only by cash documents and by the money postings of cash settlement documents match accrual. Accounts that accrual documents post to follow recognition instead: sales tax payable, opening balance equity (through opening invoices and bills), and the money lines of journal entries or expenses with AR/AP lines. Equity includes cash-basis net income. The balance sheet balances on every date because each recognition is half of a balanced pair. A cash document recognizes both sides on its date. A payment's money line is balanced on its date by its unapplied line. Each settlement then recognizes `−σ·s` for each of its two documents, and the two documents of a settlement have opposite signs `σ`, so the two amounts cancel. An accrual document recognizes its share through its recognizable postings (or the offsetting line when `W = 0`). A payment recognizes it by releasing its unapplied line. A refund recognizes it through its money line, dated the same day, because a refund is the event of its own settlements and is always fully applied (sections 4.6 and 4.13).
 
 Cash-basis parity with QuickBooks is measured, not promised, in MVP (MIGRATION_SPEC section 6). Spine example: INV-1002 (5,097.70), paid 2,500.00 on 2026-03-13, recognizes Design Income 2,206.88, Print Sales 392.33, Discounts Given (129.96), state tax 23.30 and city tax 7.45. Together these are 2,500.00.
 
@@ -428,7 +431,8 @@ Cash-basis parity with QuickBooks is measured, not promised, in MVP (MIGRATION_S
 | Line amount from qty × unit price | `round_half_up` to minor units. The stored line amount is authoritative. |
 | Percent discount | `round_half_up(S × pct / 100)` |
 | Taxable share of a discount | `round_half_up(D × S_tax / S)` |
-| Tax per rate component | Company setting `rounding.tax`: `half_up` (default, away from zero) or `half_even`, applied to `B × rate / 100` |
+| Tax per rate component (exclusive mode) | Company setting `rounding.tax`: `half_up` (default, away from zero) or `half_even`, applied to `B × rate / 100` |
+| Net base (inclusive mode) | The same `rounding.tax` mode, applied to `G × 100 / (100 + ρ)`. The tax total `t = G − B` is then split per rate and per line with `allocate` (section 4.1). |
 | Splitting one amount across lines (inclusive tax, cash basis) | `allocate` (section 7), which leaves no residue |
 | Imported documents | The source's amounts are stored as received and never recomputed. If an imported document's postings do not balance by up to ±2 minor units (source-side rounding), the difference posts to `ROUND` with line key `{doc}:rounding` and warning `import.rounding_adjusted`. A larger difference fails the document (`import.unbalanced_source`). |
 
@@ -517,7 +521,7 @@ Each statement is failable. The **Test** column names the planned test, its crat
 | I-3 | A reversal exactly cancels its original, dimension for dimension; an entry is reversed at most once. | T-LEDGER-2 proptest at the type level plus T-STORE-6 trigger test | ledger, store / W0-05, W0-04 |
 | I-3 | Random sequences of documents, edits and voids keep the trial balance at 0 and the balance sheet balanced. | T-PROP-1 property test over the full service stack | tests/scenarios / W0-03 harness, active from W2 |
 | I-3 | A void is a reversal; posted documents are never deleted. | T-STORE-9 delete and status triggers plus T-SALES-1 void test | store, sales / W0-04, W2-01 |
-| I-4 | No table stores cash-basis amounts; the cash-basis trial balance balances; a fully settled document recognizes exactly its accrual amounts. | T-REP-1 schema scan plus proptest | reports / W2-04 |
+| I-4 | No table stores cash-basis amounts; the cash-basis trial balance balances as of every date, including between the settlements of a partly settled document; a fully settled document recognizes exactly its accrual amounts. | T-REP-1 schema scan plus proptest (the generator includes documents with AR or AP postings in both directions and offsetting documents with `W = 0`) | reports / W2-04 |
 | I-4 | The spine's cash-basis P&L equals Appendix A. | T-SPINE-CASH golden | tests/scenarios / W0-03 |
 | I-5 | Entries dated on or before the hard-lock date, and settlements settled then, are refused even with an override; soft-locked dates need an override row. | T-STORE-12 trigger tests | store / W0-04 |
 | I-5 | A zero-amount payment (no journal entry) cannot be posted or voided in a hard-locked period, and in a soft-locked period needs the `period.override` permission and a reason, recorded in the `period.override` audit event. | T-SALES-3 (customer payment), T-PURCH-1 (bill payment) | sales, purchases / W2-01, W2-02 |

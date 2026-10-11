@@ -29,6 +29,7 @@ Chosen option: the algorithm in LEDGER_SPEC §7.
 * Documents without AR/AP postings are recognized at their date.
 * Payments and refunds recognize their money lines at their date and an "unapplied" report line for open credit.
 * Accrual documents recognize their non-AR/AP postings at each settlement date, by `allocate(−cum_k, w) − allocate(−cum_{k−1}, w)`, where `cum_k` is the running total of settled amounts, each signed by the side of the document it settles (so documents with AR or AP postings in both directions also recognize exactly their accrual amounts).
+* Offsetting documents, whose non-AR/AP postings net to zero (`W = 0`, where `allocate` is undefined), recognize those postings in full at their first settlement and each settled amount on an "Offsetting AR/AP documents" report line, which returns to zero when the document is fully settled. Every settlement therefore recognizes equal and opposite amounts on its two sides, so the cash-basis balance sheet balances on every date.
 
 ### Consequences
 
@@ -38,7 +39,7 @@ Chosen option: the algorithm in LEDGER_SPEC §7.
 
 ### Confirmation
 
-T-REP-1 (proptest: the cash trial balance balances, and fully settled documents equal accrual), T-SPINE-CASH (spine golden: net income 7,185.85 for March 2026).
+T-REP-1 (proptest: the cash trial balance balances as of every date, and fully settled documents equal accrual), T-SPINE-CASH (spine golden: net income 7,185.85 for March 2026).
 
 ## Pros and Cons of the Options
 

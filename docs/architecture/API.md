@@ -28,6 +28,7 @@ All three call the same `domain::ports` services. No surface can do something th
 | Filtering and sorting | Query parameters named after fields (`status=posted&status=draft`, `from=2026-03-01&to=2026-03-31`, `q=juniper`); `sort=date` or `sort=-date`. Each endpoint lists its filters in OpenAPI. |
 | Idempotency | Every `POST` that creates or changes state requires `Idempotency-Key: <8–200 chars>`, unique per principal. Same key and same body: the stored status and body are replayed with header `Idempotent-Replayed: true`. Same key, different body: 422 `idempotency.key_reused`. Same key still running: 409 `idempotency.in_progress`. Keys expire after 24 hours. Missing key: 400 `idempotency.key_required`. |
 | Optimistic concurrency | Every mutable resource has an integer `version` and is returned with `ETag: W/"<version>"`. `PUT`, `PATCH`, `DELETE` and state-changing `POST .../{id}/<action>` require `If-Match: W/"<version>"`. Stale: 412 `concurrency.version_mismatch` (QBO's SyncToken error 5010 is the analogue). Missing: 428 `concurrency.if_match_required`. |
+| Unversioned resources | These have no `version`, return no `ETag` and take no `If-Match`. Each write replaces or removes the whole value in one audited command, and the service validates it against the current state inside its transaction. They are memberships (`members.set`, `members.remove`), API tokens (`tokens.revoke`), number sequences (`sequences.set`), email settings (`email.set`), attachment links (`attachments.link`, `attachments.unlink`), period locks (`locks.set`: the reason, the owner rule for moving the hard date earlier, and the before and after values in the audit event take the place of a version) and the session (`session.logout`). |
 | Creation | 201 with `Location` and the full resource. |
 | Long work | Imports, exports, backups, verify, bulk sends, bank syncs: 202 with `Location: /api/v1/jobs/{id}` and a `Job` body. Clients poll the job (no server push in MVP; ARCHITECTURE.md §5). |
 | Request id | Every response carries `X-Request-Id` (a UUIDv7; echoed if the client sent one). The id appears in problem `instance`, logs and audit events. |
@@ -114,7 +115,7 @@ Permission names refer to section 6. "Agent" shows whether an `agent` principal 
 | POST | `/api/v1/tokens` | tokens.create | `CreateToken {name, actor_type: api\|agent, scopes[], company_id?, expires_at?}` → `TokenCreated {token, summary}` (token shown once) | session (a human) | no |
 | DELETE | `/api/v1/tokens/{tid}` | tokens.revoke | → 204 | owner of the token or `users.manage` | no |
 | GET | `/api/v1/account-templates` | templates.list | → `[CoaTemplateSummary]` | authenticated | yes |
-| GET / PUT | `/api/v1/settings/email` | email.get / email.set | `EmailSettings {host, port, username, password?, from, tls}` (password write-only; one set per installation, or per OS user on the desktop) | `installation.manage` | no |
+| GET / PUT | `/api/v1/settings/email` | email.get / email.set | `EmailSettings {host, port, username, password?, from, tls}` (password write-only, never returned; omitting it keeps the stored one, and an empty string removes it; one set per installation, or per OS user on the desktop) | `installation.manage` | no |
 | POST | `/api/v1/settings/email/test` | email.test | `{to}` → 202 `Job` | `installation.manage` | no |
 | GET | `/api/v1/jobs/{jid}` | jobs.get | → `Job {id, kind, status, progress?, result?, error?}` | job creator, or `company.read` for the job's company | yes (own jobs) |
 
@@ -246,7 +247,7 @@ Saving with `post = true` additionally needs `documents.post` and is refused for
 
 ### 5.6 Reports and audit
 
-All reports are `GET`, take `basis=accrual|cash` (default accrual) where relevant, plus dimension filters `dim[<dimension_id>]=<value_id>`, and answer `application/json` or `text/csv`.
+All reports are `GET`, take `basis=accrual|cash` (default accrual) where relevant, plus dimension filters `dim[<dimension_id>]=<value_id>`, and answer `application/json` or `text/csv`. On cash basis, the report lines of LEDGER_SPEC §7 (unapplied payments, offsetting AR/AP documents) are rows with `account_id` null in the trial balance and the profit and loss.
 
 | Path | Operation | Parameters | Response |
 |---|---|---|---|
@@ -255,7 +256,7 @@ All reports are `GET`, take `basis=accrual|cash` (default accrual) where relevan
 | `/…/reports/balance-sheet` | reports.balance_sheet | `as_of`, `compare` | `BalanceSheet {columns[], assets, liabilities, equity{rows, retained_earnings, net_income}, checks{balanced}}` |
 | `/…/reports/general-ledger` | reports.general_ledger | `from`, `to`, `account_id[]` | `GeneralLedger {accounts[{account_id, opening, rows[{date, document_id, doc_type, number, contact, memo, amount, running}], closing}]}` |
 | `/…/reports/journal` | reports.journal | `from`, `to` | `Journal {entries[{document_id, number, date, kind, postings[]}]}` |
-| `/…/reports/ar-aging`, `/…/reports/ap-aging` | reports.aging | `as_of`, `detail=summary\|detail`, `contact_id?` | `Aging {as_of, buckets[], contacts[{contact_id, name, amounts[], items[]?}], totals[]}` |
+| `/…/reports/ar-aging`, `/…/reports/ap-aging` | reports.ar_aging / reports.ap_aging | `as_of`, `detail=summary\|detail`, `contact_id?` | `Aging {as_of, buckets[], contacts[{contact_id, name, amounts[], items[]?}], totals[]}` |
 | `/…/reports/sales-tax-liability` | reports.sales_tax | `from`, `to` | `SalesTaxLiability {agencies[{agency_id, name, taxable_base, tax, payments, balance}]}` |
 | `/…/audit-events` | audit.list | `from`, `to`, `actor_type`, `entity_type`, `entity_id`, `action` | `Paged<AuditEventView>` |
 

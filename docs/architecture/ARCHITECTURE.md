@@ -39,7 +39,7 @@ Related: [LEDGER_SPEC.md](LEDGER_SPEC.md), [DATA_MODEL.md](DATA_MODEL.md), [API.
 | `crates/purchases` | AGPL | no | Bills, bill payments, vendor credits, expenses, card credits, vendor refunds | domain, store, posting, books, money | W2-02 |
 | `crates/banking` | AGPL | no | Deposits, transfers, statement import, review queue, rules, reconciliation, bank feed providers | domain, store, posting, books, ofx, money | W2-03, W4-05 |
 | `crates/reports` | AGPL | no | Report engine over `ledger_line`; accrual and cash basis; CSV output | domain, store, ledger, money | W2-04 |
-| `crates/migrate` | AGPL | no | Import pipeline (interchange → services), QBO connector, CSV and IIF sources, parity validation, rollback, export bundle | domain, store, interchange, qbo, iif, money | W3-04, W4-03 |
+| `crates/migrate` | AGPL | no | Import pipeline (interchange → services), QBO connector, CSV source (IIF source in v1), parity validation, rollback, export bundle | domain, store, interchange, qbo, iif, money | W3-04, W4-03 |
 | `crates/identity` | AGPL | no | Users, memberships, sessions, API and agent tokens, authentication, server secret store (envelope encryption) | domain, store | W1-03 |
 | `crates/render` | AGPL | no | Typst templates for sales documents (invoice, estimate, sales receipt, credit memo, refund receipt) → PDF and SVG preview; email via SMTP | domain, store, money | W4-04 |
 | `crates/api` | AGPL | no | axum router, middleware (auth, idempotency, ETag, errors, limits), OpenAPI document, route modules per area | domain, api-types, money | W1-05 |
@@ -516,6 +516,7 @@ Rules:
 | `/reports/{trial-balance,profit-and-loss,balance-sheet,general-ledger,journal,ar-aging,ap-aging,sales-tax}` | `pages/reports` | W4-01 |
 | `/close`, `/audit`, `/migrate` | `pages/close`, `pages/audit`, `pages/migrate` | W4-01 |
 | Print and email actions on sales documents | `pages/sales/print.rs` | W5-03 |
+| The email settings form (W2-05 routes `/settings/email` to a placeholder) | `pages/settings/email.rs` | W5-03 |
 | `/login`, `/companies` (outside a company) | `pages/session` | W2-05 |
 
 ## 11. Terminology (own UI copy, clean room)
