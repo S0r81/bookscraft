@@ -336,8 +336,43 @@ The register above is what the checkpoint approved. Writing the specs refined th
 
 ## 11. Independent review log (Step 4)
 
-Findings from the independent qa-verifier review that were rejected are logged here with reasons.
+Each review ran as a fresh subagent with the qa-verifier instructions and none of the lead architect's reasoning. The reviewers read the repository, loaded both schemas into SQLite and recomputed the ledger arithmetic with their own scratch models. Every finding was accepted and fixed. **No finding was rejected**, so there are no rejection reasons to record. Where a fix differs from the reviewer's first suggestion, §11.2 gives the reason.
 
-| Finding | Source | Disposition | Reason |
+### 11.1 Rounds
+
+| Round | Focus | Reviewed | Verdict | Findings | Fixed in |
+|---|---|---|---|---|---|
+| 1a | Ledger specs, schema, invariant tests | tree at e712574 | fail | 19 (7 major, 12 minor) | 4eab253 to c723416 |
+| 1b | Prompts and the parallel process | tree at e712574 | fail | 20 (4 blocking, 4 major, 12 minor) | 4eab253 to c723416 |
+| 1c | Cross-document contradictions, Claude Code config | tree at e712574 | fail | 23 (6 major, 17 minor) | 4eab253 to c723416 |
+| 2 | Every change made by round 1's fixes | e712574..c723416 | fail | 18 (4 major, 14 minor) | 158a6a6 to 83a151d |
+| 3 | Every change made by round 2's fixes | c723416..83a151d | fail | 8 (1 major, 7 minor) and 2 notes outside the range | 75d24b6, 3625655 |
+
+### 11.2 Fixed differently from the reviewer's first suggestion
+
+| Finding | Suggested | Fix taken | Why |
 |---|---|---|---|
-| None yet | Step 4 has not run | n/a | n/a |
+| 1a F-17: T-AUDIT-1 cannot catch a command that skips its audit event | One enumeration test over the mutating operations | The store refuses to commit a company-file transaction that changed rows without an audit event (`audit.event_required`, LEDGER_SPEC §10) | A runtime guard covers every write path, including ones no test lists |
+| 1b F-7: W4-03 and W4-05 cannot register their capabilities | Capability lists in the placeholder modules, or registration by the Weave | W4-03 and W4-05 own their crate's `lib.rs` for that one change; the placeholders take `&Ctx`, `Stores`, `Infra` and `Services` | One `CAPABILITIES` list per crate (ARCHITECTURE §4.4), and no Weave edit is needed |
+| 1b F-18: IIF, custom fields and the MCP server are in the MVP without a record | Record the moves, or move them to v1 | IIF moved to v1; custom fields and the MCP stretch recorded in §9.1 | Nothing in the MVP uses IIF; lossless import needs custom fields |
+| 1c F-4: the docs disagree on agent drafts of deposits and transfers | Limit agent proposals to expenses, or reword | Reworded: agents never post, and create deposits and transfers only as bank-line proposal drafts (API.md §5.4, §8) | Bank-line categorization is the main agent task, and I-10 already stops money movement |
+| 1c F-8: skill commands match no allow rule | Quote-aware allow rules, or unquoted `GET` calls with `-f` | Skills call `gh api repos/S0r81/bookscraft/... --method GET -f k=v` without quotes; allow rules added for `git ls-remote` and `git ls-tree` | Quoted URLs defeat permission matching (Claude Code permissions docs) |
+| 1c F-19: the handoff README and the skills disagree about PR descriptions | Fix the README, and have the Weave read the latest description comment | README fixed; the description stays as the opening session wrote it. Round 2 F-5 caught a leftover contradiction in that fix, now corrected | `gh api -X PATCH` stays in `ask` |
+| 2 F-4: DATA_MODEL cites exempt resources that API.md does not list | Add the exempt list to API.md §2 | Added as "unversioned resources", including period locks and the session, which the same rule covered | Every `PUT`, `PATCH` and `DELETE` target now has a stated concurrency rule |
+| 2 F-12: W2-05 builds the email settings screen before its API exists | Defer the screen | A placeholder in W2-05, filled by W5-03 in the same file and component | `routes.rs` is fixed in W2-05; only the page body changes |
+| 3 F-3: nothing tests that refunds are fully applied | Refusal tests, or derive the amount | The refund's amount is derived from its applications (`R = ΣR_k`, LEDGER_SPEC §4.6, §4.13) | Full application holds by construction, with no new error code |
+
+### 11.3 Found while fixing
+
+These changes were made while fixing review findings, without a reviewer asking for them:
+
+- W3-04 AC-9 asserted a placeholder's 501, which CLAUDE.md §6 forbids. It now tests through a fake service.
+- W2-03's deposit tests depended on the concurrent sales and purchases packages. They now build their sources through `posting::post` and the store.
+- Customer and bill payments had no input field for their amount, because API.md §7.1 computes totals. `amount` was added for payments only.
+- AR/AP lines on card credits and deposits are now open items, like expense and JE lines (round 3, note outside the range).
+- A negative tax base is refused with `money.negative_tax_base`, which keeps every tax posting balanced (round 3, note outside the range).
+
+### 11.4 Limits
+
+- The round 3 fixes were not reviewed again by a fresh agent. They were checked with a scratch cash-basis model (balanced on every date across 2,000 random ledgers; the replaced `W = 0` rule fails the same check) and with the repository consistency checks: prompt sections, OWNERSHIP, the CODEOWNERS mirror and the schema trigger cases.
+- No Rust exists yet, so no reviewer could run a prompt's Verify commands.
