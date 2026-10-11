@@ -367,4 +367,4 @@ Never force-push, rebase shared branches, amend pushed commits or delete history
 
 ## 10. How this process was checked
 
-The traceability matrix (every MVP feature to tables, posting rules, API and prompts) and the invariant coverage (every invariant to a test and the prompt that writes it) are in [ROADMAP §7–§8](../roadmap/ROADMAP.md). An independent reviewer checked the docs and prompts for contradictions, overlapping owned paths, unfailable acceptance criteria and missing conflict rules; rejected findings are logged in [BRIEF_AUDIT §11](../architecture/BRIEF_AUDIT.md).
+The traceability matrix (every MVP feature to tables, posting rules, API and prompts) and the invariant coverage (every invariant to a test and the prompt that writes it) are in [ROADMAP §7–§8](../roadmap/ROADMAP.md). Three rounds of independent review (fresh qa-verifier subagents, five reviews in all) checked the docs and prompts for contradictions, overlapping owned paths, unfailable acceptance criteria, missing conflict rules and ledger arithmetic. [BRIEF_AUDIT §11](../architecture/BRIEF_AUDIT.md) logs every round and how its findings were fixed; none was rejected.
