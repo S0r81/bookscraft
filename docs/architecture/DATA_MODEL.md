@@ -14,7 +14,7 @@ Status: accepted (2026-10-10). Owner: `storage-engineer`. Normative DDL: [`schem
 | Decimal (qty, unit price, rates, percents) | `TEXT` canonical decimal: optional `-`, digits, optional fraction, no exponent; never `REAL` or `NUMERIC` | `rust_decimal::Decimal`, written with `normalize()` |
 | Boolean | `INTEGER` 0/1 with CHECK | `bool` |
 | JSON | `TEXT` with `json_valid()` CHECK | typed struct via `serde` |
-| Optimistic concurrency | `version INTEGER` on every row the API changes by id (lists, documents, bank lines, bank rules, bank feeds, reconciliations, import runs, the company), +1 per update; the exempt resources are listed in API.md §2 | ETag `W/"<version>"` at the API (API.md §2) |
+| Optimistic concurrency | `version INTEGER` on every row the API changes by id (lists, documents, bank lines, bank rules, bank feeds, reconciliations, import runs, the company), +1 per update; the unversioned resources (no `version`, no `If-Match`) are listed in API.md §2 | ETag `W/"<version>"` at the API (API.md §2) |
 | Error codes from triggers | `RAISE(ABORT, '<namespace>.<code>')` | `store::StoreError::Constraint(ErrorCode)` mapped 1:1 to API error codes |
 
 Every table is `STRICT`. Foreign keys are enforced (`PRAGMA foreign_keys = ON` on every connection).
