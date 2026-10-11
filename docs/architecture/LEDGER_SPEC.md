@@ -99,7 +99,7 @@ Each table lists the postings in order. "When" gives the condition for writing a
 
 ### 4.1 Invoice
 
-Tax mode `exclusive` (the default). Validation: `T >= 0`, contact is a customer, `AR` is an AR account, line accounts are not AR, AP, bank or credit card accounts.
+Tax mode `exclusive` (the default). Validation: `T >= 0`, contact is a customer, `AR` is an AR account, line accounts are not AR, AP, bank or credit card accounts, and the tax base is not negative in any tax mode (`B >= 0`, or `G >= 0` for inclusive tax; a negative taxable amount belongs on a credit memo; `money.negative_tax_base` from `calc::document_totals`).
 
 | # | Account | Contact | Dr | Cr | When | Line key |
 |---|---|---|---|---|---|---|
@@ -211,7 +211,7 @@ Pays out a customer's credit balance (an unapplied payment or credit memo). The 
 | 1 | `AR` | customer | `R` | | `R > 0` | `{doc}:ar` |
 | 2 | `MONEY` (bank) | | | `R` | `R > 0` | `{doc}:money` |
 
-Settlements: `(charge = this refund, credit = credit document_k, amount = R_k)` with `ΣR_k = R`. Validation: `R` ≤ the total open credit of the referenced documents.
+Settlements: `(charge = this refund, credit = credit document_k, amount = R_k)`. The refund's amount is derived, `R = ΣR_k`, so a refund is always fully applied; each `R_k` is bounded by that document's open credit (section 5 rule 3).
 
 ### 4.7 Estimate
 
@@ -267,7 +267,7 @@ A refund or credit to a credit card (QBO Purchase with `Credit = true`).
 | # | Account | Contact | Dr | Cr | When | Line key |
 |---|---|---|---|---|---|---|
 | 1 | `MONEY` (credit card) | | `T` | | `T > 0` | `{doc}:money` |
-| 2..n | `EXP(l)` | line contact | `-a_l` if `a_l < 0` | `a_l` if `a_l > 0` | `a_l ≠ 0` | line key |
+| 2..n | `EXP(l)` (AR/AP allowed with a line contact, as in section 4.11) | line contact | `-a_l` if `a_l < 0` | `a_l` if `a_l > 0` | `a_l ≠ 0` | line key |
 
 ### 4.13 Vendor refund
 
@@ -278,7 +278,7 @@ Money received from a vendor for an open vendor credit. It raises AP, so it is t
 | 1 | `MONEY` (bank or undeposited funds) | | `R` | | `R > 0` | `{doc}:money` |
 | 2 | `AP` | vendor | | `R` | `R > 0` | `{doc}:ar` |
 
-Settlements: `(charge = this refund, credit = vendor credit_k, amount = R_k)` with `ΣR_k = R`. Validation: `R` ≤ the total open credit of the referenced vendor credits.
+Settlements: `(charge = this refund, credit = vendor credit_k, amount = R_k)`. As in section 4.6, `R = ΣR_k` is derived, so a refund is always fully applied.
 
 ### 4.14 Deposit
 
@@ -288,7 +288,7 @@ The bank deposit. It groups undeposited funds into one bank line and may add oth
 |---|---|---|---|---|---|---|
 | 1 | `MONEY` (bank) | | `T` | | `T > 0` | `{doc}:money` |
 | 2..k | undeposited funds (the source document's money account) | | | `a_j` | each `deposit_source` line | line key |
-| k+1.. | line `account_id` | line contact | `-a_l` if `a_l < 0` | `a_l` if `a_l > 0` | each `account` line, `a_l ≠ 0` | line key |
+| k+1.. | line `account_id` (AR/AP allowed with a line contact, as in section 4.11) | line contact | `-a_l` if `a_l < 0` | `a_l` if `a_l > 0` | each `account` line, `a_l ≠ 0` | line key |
 
 Validation:
 
@@ -350,8 +350,8 @@ The `settlement` table is BooksCraft's form of QBO `LinkedTxn` between AR and AP
 
 | Ledger | Charge documents (raise the balance) | Credit documents (lower the balance) |
 |---|---|---|
-| ar | invoice; customer refund; JE or expense line Dr AR | customer payment; credit memo; JE line Cr AR |
-| ap | bill; vendor refund; JE line Cr AP | bill payment; vendor credit; expense or JE line Dr AP |
+| ar | invoice; customer refund; a line that debits AR on an expense, card credit, deposit or JE | customer payment; credit memo; a line that credits AR on an expense, card credit, deposit or JE |
+| ap | bill; vendor refund; a line that credits AP on an expense, card credit, deposit or JE | bill payment; vendor credit; a line that debits AP on an expense, card credit, deposit or JE |
 
 Rules:
 
@@ -398,9 +398,9 @@ BooksCraft stores one accrual ledger (I-4). Cash basis is computed at report tim
 
 | Class | Definition | Cash-basis treatment |
 |---|---|---|
-| Cash document | No postings to AR or AP accounts (sales receipt, refund receipt, expense without AR/AP lines, card credit, deposit, transfer, JE without AR/AP lines, opening balance) | Every posting is recognized at its entry date, unchanged. |
+| Cash document | No postings to AR or AP accounts (sales receipt, refund receipt, transfer, opening balance, and an expense, card credit, deposit or JE without AR/AP lines), or AR/AP postings that net to zero on every (account, contact), which leave nothing open to settle | Every posting is recognized at its entry date, unchanged (AR/AP postings that net to zero per contact cancel on that date). |
 | Cash settlement document | Customer payment, bill payment, customer refund, vendor refund | Money postings are recognized at the entry date. AR/AP postings are never recognized. For payments, the unapplied credit is recognized as a report line: **Unapplied customer payments** (income section, credit) or **Unapplied vendor payments** (expense section, debit). It is recognized at the payment date for the full amount and reduced by each settlement in which the payment is the credit, on that settlement's date. |
-| Accrual document | Any other document with AR or AP postings (invoice, credit memo, bill, vendor credit, JE or expense with AR/AP lines) | AR/AP postings are never recognized. Its other postings (the recognizable postings, weights `w`) are recognized only through the settlements in which it is a charge or a credit. |
+| Accrual document | Any other document with AR or AP postings (invoice, credit memo, bill, vendor credit, and an expense, card credit, deposit or JE with AR/AP lines) | AR/AP postings are never recognized. Its other postings (the recognizable postings, weights `w`) are recognized only through the settlements in which it is a charge or a credit. |
 
 **Accrual-document recognition.** For accrual document `X`, let `w` be its recognizable postings and `W = Σw`. Take its active settlements in `(settled_on, id)` order. For settlement `k` on (`account_k`, `contact_k`) with amount `s_k > 0`, let `σ_k` be the sign (+1 or −1) of the sum of `X`'s postings to (`account_k`, `contact_k`). The signed running total and the recognized amount of each posting at settlement `k` are:
 
@@ -411,7 +411,7 @@ recognized_k = allocate(−cum_k, w) − allocate(−cum_{k−1}, w)
 
 The result is recognized on `settled_on` of settlement `k`, and it totals `−σ_k·s_k`. When `X` is fully settled, `cum` equals the sum of `X`'s AR/AP postings, which is `−W`, so `X` recognizes exactly its accrual amounts and the cents never drift. Signing each settlement by its side keeps this true for a document with AR or AP postings in both directions, such as a journal entry with an AR line and an AP line.
 
-**Offsetting documents (`W = 0`).** When the recognizable postings net to zero, or there are none (a journal entry that moves a balance from one customer to another, or nets a customer's AR against the same party's AP), `allocate` is undefined. Such a document recognizes its recognizable postings in full on the date of its first active settlement, and each settlement `k` recognizes `−σ_k·s_k` on the report line **Offsetting AR/AP documents** (other income section, signed). The line carries only the part of the document settled on one side and not yet on the other. It returns to zero when the document is fully settled, because `cum` then equals `−W = 0`.
+**Offsetting documents (`W = 0`).** When an accrual document's recognizable postings net to zero, or there are none (a journal entry that moves a balance from one customer to another, or nets a customer's AR against the same party's AP), `allocate` is undefined. Such a document recognizes its recognizable postings in full on the date of its first active settlement, and each settlement `k` recognizes `−σ_k·s_k` on the report line **Offsetting AR/AP documents** (income section, signed). The line carries only the part of the document settled on one side and not yet on the other. It returns to zero when the document is fully settled, because `cum` then equals `−W = 0`.
 
 Consequences:
 
@@ -521,7 +521,7 @@ Each statement is failable. The **Test** column names the planned test, its crat
 | I-3 | A reversal exactly cancels its original, dimension for dimension; an entry is reversed at most once. | T-LEDGER-2 proptest at the type level plus T-STORE-6 trigger test | ledger, store / W0-05, W0-04 |
 | I-3 | Random sequences of documents, edits and voids keep the trial balance at 0 and the balance sheet balanced. | T-PROP-1 property test over the full service stack | tests/scenarios / W0-03 harness, active from W2 |
 | I-3 | A void is a reversal; posted documents are never deleted. | T-STORE-9 delete and status triggers plus T-SALES-1 void test | store, sales / W0-04, W2-01 |
-| I-4 | No table stores cash-basis amounts; the cash-basis trial balance balances as of every date, including between the settlements of a partly settled document; a fully settled document recognizes exactly its accrual amounts. | T-REP-1 schema scan plus proptest (the generator includes documents with AR or AP postings in both directions and offsetting documents with `W = 0`) | reports / W2-04 |
+| I-4 | No table stores cash-basis amounts; the cash-basis trial balance balances as of every date, including between the settlements of a partly settled document; a fully settled document recognizes exactly its accrual amounts. | T-REP-1 schema scan plus proptest (the generator includes documents with AR or AP postings in both directions, offsetting documents with `W = 0`, and documents whose AR/AP postings net to zero per contact) | reports / W2-04 |
 | I-4 | The spine's cash-basis P&L equals Appendix A. | T-SPINE-CASH golden | tests/scenarios / W0-03 |
 | I-5 | Entries dated on or before the hard-lock date, and settlements settled then, are refused even with an override; soft-locked dates need an override row. | T-STORE-12 trigger tests | store / W0-04 |
 | I-5 | A zero-amount payment (no journal entry) cannot be posted or voided in a hard-locked period, and in a soft-locked period needs the `period.override` permission and a reason, recorded in the `period.override` audit event. | T-SALES-3 (customer payment), T-PURCH-1 (bill payment) | sales, purchases / W2-01, W2-02 |

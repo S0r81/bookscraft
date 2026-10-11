@@ -25,7 +25,7 @@ Status: accepted (2026-10-10). Owner: `import-migration-engineer`. Crates: `inte
 | Idempotent (I-7) | `external_ref` is unique on `(source, realm, external_type, external_id)`. A re-run creates nothing that already exists (section 9). |
 | Same rules as people | Imported documents go through the same service commands and posting rules (`via = import`, actor = the importing user). The only import-only allowances: source amounts are kept as received (LEDGER_SPEC §8.1), tax mode `inclusive` is accepted, and `is_residual` journal entries can be created. |
 | Verified | Each run ends with validation (section 6). Its result is stored on `import_run.validation_json` and shown to the user. |
-| Reversible | Each run starts with an automatic backup and can be rolled back (section 10). |
+| Reversible | Each run starts with a pre-import backup, a copy not marked `auto`, so backup pruning never removes it (DATA_MODEL §2), and can be rolled back (section 10). |
 
 ## 3. Interchange model and bundle (crate `interchange`, MIT)
 
@@ -206,7 +206,7 @@ This gives one-way refresh for parallel running during cut-over. Two-way sync is
 | Case | Procedure |
 |---|---|
 | Migration into a new company file (default) | Rollback means discarding the new file. BooksCraft archives the registry entry and leaves the file in place for the user to delete (BooksCraft never deletes a user file). |
-| Import into an existing company, no other activity since | If no audit event exists after `import_run.last_audit_seq`, restore the automatic pre-import backup under the company lock, and mark the run `rolled_back` in the restored file's registry and a new audit event. |
+| Import into an existing company, no other activity since | If no audit event exists after `import_run.last_audit_seq`, restore the pre-import backup under the company lock, and mark the run `rolled_back` in the restored file's registry and a new audit event. |
 | Import into an existing company, with later activity | Void every document the run posted, in reverse order (append-only reversals, I-3), with reason `import rollback <run id>`; archive the list rows it created; mark the run `rolled_back` |
 
 ## 11. Export (MVP)

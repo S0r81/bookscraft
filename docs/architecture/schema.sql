@@ -939,7 +939,7 @@ CREATE TABLE import_run (
     options_json       TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(options_json)),
     stats_json         TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(stats_json)),
     validation_json    TEXT CHECK (validation_json IS NULL OR json_valid(validation_json)),
-    backup_path        TEXT,                               -- automatic pre-import backup
+    backup_path        TEXT,                               -- pre-import backup (not marked auto)
     first_audit_seq    INTEGER,
     last_audit_seq     INTEGER,
     actor_id           TEXT NOT NULL,

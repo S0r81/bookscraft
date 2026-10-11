@@ -99,9 +99,9 @@ Schema evolution: migrations are forward-only, embedded in the binary and number
 | bill_payment | vendor (req.) | AP (req.) | bank or card (req. if total > 0) | none | §4.9 | event; credit (ap) | BillPayment |
 | vendor_credit | vendor (req.) | AP (req.) | — | item, account | §4.10 | credit (ap) | VendorCredit |
 | expense | any (opt.) | — | bank, card or cash (req.) | item, account | §4.11 | charge or credit via AR/AP lines | Purchase (Cash, Check, CreditCard) |
-| card_credit | any (opt.) | — | card (req.) | item, account | §4.12 | — | Purchase with `Credit = true` |
+| card_credit | any (opt.) | — | card (req.) | item, account | §4.12 | charge or credit via AR/AP lines | Purchase with `Credit = true` |
 | vendor_refund | vendor (req.) | AP (req.) | bank or UF (req.) | none | §4.13 | event; charge (ap) | Deposit line linked to a VendorCredit (imported through undeposited funds plus a `deposit_source` line, MIGRATION_SPEC §4.3) |
-| deposit | — | — | bank (req.) | deposit_source, account | §4.14 | — | Deposit |
+| deposit | — | — | bank (req.) | deposit_source, account | §4.14 | charge or credit via AR/AP lines | Deposit |
 | transfer | — | — | destination (req.) | one account line = source | §4.15 | — | Transfer, CreditCardPayment |
 | journal_entry | — | — | — | account (signed) | §4.16 | charge or credit via AR/AP lines | JournalEntry |
 | opening_balance | — | — | — | account (signed) | §4.17 | — | (none; built by the migrator or the setup wizard) |

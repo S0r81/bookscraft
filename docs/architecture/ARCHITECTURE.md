@@ -173,7 +173,7 @@ D-1, D-7 and D-8 are about normal dependencies. Dev-dependencies used only by te
 
 ### 4.2 Service ports
 
-All methods are synchronous (`fn`); handlers call them inside `tokio::task::spawn_blocking`. Every write method takes `&Ctx` and a command and returns the saved entity (or view) with its new `version`. Every read method takes `&Ctx` and filters. Errors are `DomainError`. Method names mirror API operations one to one (API.md §5).
+All methods are synchronous (`fn`); handlers call them inside `tokio::task::spawn_blocking`. Every write method takes `&Ctx` and a command and returns the saved entity (or view), with its new `version` unless it is one of API.md §2's unversioned resources. Every read method takes `&Ctx` and filters. Errors are `DomainError`. Method names mirror API operations one to one (API.md §5).
 
 | Trait | Implemented by | Covers |
 |---|---|---|
